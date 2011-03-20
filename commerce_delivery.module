@@ -171,7 +171,7 @@ function commerce_delivery_menu(){
     'title' => 'Create a delivery ',
     'description' => 'Create a new delivery for the specified order.',
     'page callback' => 'commerce_delivery_add',
-    'access arguments' => array('administer deliveries'),
+    'access arguments' => array('commerce_delivery_administer_deliveries'),
     'weight' => 10,
     'type' => MENU_NORMAL_ITEM,
   );
@@ -180,7 +180,7 @@ function commerce_delivery_menu(){
     'description' => 'Create a new delivery for the specified order.',
     'page callback' => 'commerce_delivery_add',
     'page arguments' => array(4),
-    'access arguments' => array('administer deliveries'),
+    'access arguments' => array('commerce_delivery_administer_deliveries'),
     'weight' => 10,
     'type' => MENU_NORMAL_ITEM,
   );
@@ -189,7 +189,7 @@ function commerce_delivery_menu(){
     'description' => 'Configure general delivery settings, fields, and displays.',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('commerce_delivery_settings_form'),
-    'access arguments' => array('administer deliveries'),
+    'access arguments' => array('commerce_delivery_administer_deliveries'),
     'weight' => 0,
     'type' => MENU_NORMAL_ITEM,
   );
@@ -202,7 +202,7 @@ function commerce_delivery_menu(){
     'title' => 'View',
     'type' => MENU_LOCAL_TASK,
     'page arguments' => array(4),
-    'access arguments' => array('administer deliveries'),
+    'access arguments' => array('commerce_delivery_administer_deliveries'),
     'weight' => -10,
     'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
   );
@@ -210,7 +210,7 @@ function commerce_delivery_menu(){
     'title' => 'Edit',
     'type' => MENU_LOCAL_TASK,
     'page arguments' => array(4),
-    'access arguments' => array('administer deliveries'),
+    'access arguments' => array('commerce_delivery_administer_deliveries'),
     'weight' => -5,
     'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
   );
@@ -218,7 +218,7 @@ function commerce_delivery_menu(){
     'title' => 'Delete',
     'type' => MENU_LOCAL_TASK,
     'page arguments' => array(4),
-    'access arguments' => array('administer deliveries'),
+    'access arguments' => array('commerce_delivery_administer_deliveries'),
     'weight' => 20,
     'context' => MENU_CONTEXT_INLINE,
   );
@@ -268,11 +268,6 @@ function commerce_delivery_field_extra_fields() {
     ),
   );
   return $return;
-}
-
-function commerce_delivery_config() {
-  
-  return t('Delivery settings page.');
 }
 
 function commerce_delivery_add($order_id = NULL) {
