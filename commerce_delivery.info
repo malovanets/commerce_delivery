@@ -1,0 +1,28 @@
+; $Id$
+name = Delivery
+description = Defines the Delivery entity and associated features.
+package = Commerce
+core = 7.x
+
+; Base module files
+files[] = commerce_delivery.module
+files[] = commerce_delivery.install
+
+; Module includes
+files[] = includes/commerce_delivery.controller.inc
+files[] = includes/commerce_delivery.views.inc
+files[] = includes/commerce_delivery_handler_field_delivery_status.inc
+files[] = includes/commerce_delivery_handler_filter_delivery_status.inc
+files[] = includes/commerce_delivery_handler_delivery_action_links.inc
+
+; Tests
+;files[] = tests/commerce_delivery.test
+
+dependencies[] = commerce
+dependencies[] = entity
+dependencies[] = views
+dependencies[] = commerce_line_item
+
+configure = admin/commerce/deliveries
+version = "7.x-1.x-dev"
+
