@@ -19,13 +19,13 @@ function commerce_delivery_rules_event_info() {
     'label' => t('After saving a new delivery'),
     'group' => t('Commerce Delivery'),
     'variables' => commerce_delivery_rules_event_variables(t('Created delivery'), TRUE),
-//    'access callback' => 'commerce_delivery_rules_access',
+    'access callback' => 'commerce_delivery_rules_access',
   );
   $events['commerce_delivery_update'] = array(
     'label' => t('After updating an existing delivery'),
     'group' => t('Commerce Delivery'),
     'variables' => commerce_delivery_rules_event_variables(t('Updated delivery'), TRUE),
-//    'access callback' => 'commerce_delivery_rules_access',
+    'access callback' => 'commerce_delivery_rules_access',
   );
 /*  $events['commerce_delivery_delete'] = array(
     'label' => t('After deleting a delivery'),
@@ -137,7 +137,8 @@ function commerce_delivery_rules_condition_info() {
 }
 
 /**
- * Rules condition: checks to see if the given order has shippable items
+ * Rules condition callback: 
+ * checks to see if the given order has shippable items
  */
 function commerce_delivery_order_has_shippable_item($order) {
   $shippables = views_get_view_result('shippable_items', 'defaults', $order->order_id);
@@ -148,7 +149,8 @@ function commerce_delivery_order_has_shippable_item($order) {
 }
 
 /**
- * Rules condition: checks to see if the given order has a selected status 
+ * Rules condition callback: 
+ * checks to see if the given order has a selected status 
  */
 function commerce_delivery_order_has_status($order, $status_list) {
   if (in_array($order->status,$status_list)) {
@@ -158,8 +160,13 @@ function commerce_delivery_order_has_status($order, $status_list) {
 }
 
 /**
- * Callback function & Rules condition: 
+ * Rules condition callback: 
  * checks to see if the given line item is shippable
+ *
+ * @param $line_item
+ *
+ * @return 
+ *   TRUE or FALSE
  */
 function commerce_delivery_item_is_shippable($line_item) {
   $wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
@@ -167,7 +174,8 @@ function commerce_delivery_item_is_shippable($line_item) {
 }
 
 /**
- * Rules condition: checks to see if the given item is in any delivery 
+ * Rules condition callback: 
+ * checks to see if the given item is in any delivery 
  */
 function commerce_delivery_item_is_orphan($line_item) {
   // FIXME: find a way to avoid using ['und'][0]['value']
@@ -178,7 +186,8 @@ function commerce_delivery_item_is_orphan($line_item) {
 }
 
 /**
- * Rules condition: checks to see if the given order has delivery with active status 
+ * Rules condition callback: 
+ * checks to see if the given order has delivery with active status 
  */
 function commerce_delivery_active_delivery_exists($order) {
   // getting this order deliveries.
@@ -219,7 +228,8 @@ function commerce_delivery_rules_action_info() {
 }
 
 /**
- * Rules action: assign line items to order default delivery.
+ * Rules action callback: 
+ * assign line items to order default delivery.
  */
 function commerce_delivery_assign_delivery($line_item) {
   // getting this order deliveries. 
@@ -233,7 +243,8 @@ function commerce_delivery_assign_delivery($line_item) {
 }
 
 /**
- * Rules action: assign orphan line items to order default delivery.
+ * Rules action callback: 
+ * assign orphan line items to order default delivery.
  */
 function commerce_delivery_assign_orphans($delivery) {
   // getting shippable items from this order
@@ -249,43 +260,3 @@ function commerce_delivery_assign_orphans($delivery) {
   }
 }
 
-/**
-* Implements hook_default_rules_configuration().
-*/
-function commerce_delivery_default_rules_configuration() {
-  $rule = rules_reaction_rule();
-  $rule->label = 'Add delivery';
-  $rule->event('commerce_order_insert')
-       ->event('commerce_order_update')
-       ->condition(rules_condition('commerce_delivery_active_delivery_exists', array('order:select' => 'order'))->negate())
-       ->condition('commerce_delivery_order_has_shippable_item', array('order:select' => 'order'))
-       ->condition('commerce_delivery_order_has_status', array('order:select' => 'order','status' => array('pending'=>'pending', 'processing'=>'processing')))
-       ->action('entity_create', array('type' => 'commerce_delivery', 'param_order_id:select' => 'order:order_id', 'param_status' => '0'));
-  $configs['rules_add_delivery'] = $rule;
-  
-  $rule = rules_reaction_rule();
-  $rule->label = 'Assign new line item to delivery';
-  $rule->event('commerce_line_item_insert')
-       ->condition('commerce_delivery_item_is_shippable', array('line_item:select' => 'line_item'))
-       ->condition('entity_exists', array('type' => 'commerce_delivery','property' => 'order_id', 'value:select' => 'line-item:order-id'))
-       ->action('commerce_delivery_assign_delivery', array('line_item:select' => 'line_item', 'delivery_status' => array('0' , '1')));
-  $configs['rules_assign_line_item_to_delivery'] = $rule;
-
-  $rule = rules_reaction_rule();
-  $rule->label = 'Assign orphan item to new delivery';
-  $rule->event('commerce_delivery_insert')
-       ->action('commerce_delivery_assign_orphans', array('delivery:select' => 'delivery',));
-  $configs['rules_assign_orphan_to_new_delivery'] = $rule;
-  
-/* 
-** not needed any more. leaving it as example of adding a rules component by code
-**
-  $rule = rule(array('line_item' => array('label' => 'line_item', 'type' => 'commerce_line_item',)));
-  $rule->label = 'Item to delivery';
-  $rule->condition('commerce_delivery_item_is_shippable', array('line_item:select' => 'line_item'))
-       ->condition('commerce_delivery_item_is_orphan', array('line_item:select' => 'line_item'))
-       ->action('commerce_delivery_assign_orphans', array('line_item:select' => 'line_item',));
-  $configs['rules_item_to_delivery'] = $rule;
- */ 
-  return $configs;
-}

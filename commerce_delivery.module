@@ -6,7 +6,8 @@
  * Defines features and functions common to the commerce delivery module.
  *
  * TODO:
- *   - admin pages to manage order deliveries (and assign items)
+ *  - admin pages to manage order deliveries (and assign items)
+ *  - delivery reference field with own formatters (instead of number_integer)
  */
 
 /**
@@ -97,7 +98,7 @@ function commerce_delivery_new($values = array()) {
  *
  * @param $delivery
  *   The full delivery object to save. If $delivery->delivery_id is empty, a new delivery
- *     will be created. TODO
+ *     will be created. 
  *
  * @return
  *   The saved delivery object.
@@ -105,14 +106,6 @@ function commerce_delivery_new($values = array()) {
 function commerce_delivery_save($delivery) {
   return entity_get_controller('commerce_delivery')->save($delivery);
 }
-
-/**
- * Implements hook_commerce_line_item_presave_insert(&$line_item)
- */
-function commerce_delivery_commerce_line_item_update($line_item) {
-  // No example.
- // dsm(get_defined_vars());
-  }
 
 /**
  * Callback for getting order properties.
@@ -272,7 +265,6 @@ function commerce_delivery_field_extra_fields() {
 
 function commerce_delivery_add($order_id = NULL) {
 // TODO: check order_id
-
 if ($order_id == '') {
   return t('Required Order ID missing.');
 }
