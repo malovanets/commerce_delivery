@@ -2,6 +2,7 @@
 // $Id$
 
 /**
+ * @file
  * Export Drupal Commerce deliveries to Views.
  */
 

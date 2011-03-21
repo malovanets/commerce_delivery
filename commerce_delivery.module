@@ -82,7 +82,7 @@ function commerce_delivery_entity_info() {
 /**
  * Callback returning delivery url.
  */
-function commerce_delivery_uri($delivery){
+function commerce_delivery_uri($delivery) {
   return array( 'path' => 'delivery/' . $delivery->id);
 }
 
@@ -130,10 +130,10 @@ function commerce_delivery_get_properties($order, array $options, $name) {
 /**
  * Loads a delivery by ID.
  */
-function commerce_delivery_load($pid = NULL, $reset = FALSE){
-  $pids = (isset ($pid) ? array($pid) : array());
+function commerce_delivery_load($pid = NULL, $reset = FALSE) {
+  $pids = (isset($pid) ? array($pid) : array());
   $delivery = commerce_delivery_load_multiple($pids, $reset);
-  return $delivery ? reset ($delivery) : FALSE;
+  return $delivery ? reset($delivery) : FALSE;
 }
 
 /**
@@ -152,14 +152,14 @@ function commerce_delivery_load($pid = NULL, $reset = FALSE){
  * @return
  *   An array of delivery objects indexed by delivery_id.
  */
-function commerce_delivery_load_multiple($pids = array(), $conditions = array(), $reset = FALSE){
+function commerce_delivery_load_multiple($pids = array(), $conditions = array(), $reset = FALSE) {
   return entity_load('commerce_delivery', $pids, $conditions, $reset);
 }
 
 /**
  * Implements hook_menu().
  */
-function commerce_delivery_menu(){
+function commerce_delivery_menu() {
   $items['admin/commerce/deliveries/add'] = array(
     'title' => 'Create a delivery ',
     'description' => 'Create a new delivery for the specified order.',
@@ -284,8 +284,8 @@ if ($order_id == '') {
  */
 function commerce_delivery_get_status() {
   $options_array = variable_get('commerce_delivery_status_options');
-  $options_array = explode("\n",$options_array);
-  foreach($options_array as $option) {
+  $options_array = explode("\n", $options_array);
+  foreach ($options_array as $option) {
     $option = explode('|', $option);
     $options[$option[0]] = t($option[1]); 
   }
@@ -405,9 +405,10 @@ function commerce_delivery_settings_form($form, &$form_state) {
       '#options' => $query->fetchAllKeyed(),
       '#default_value' => variable_get('commerce_delivery_shippable_field', ''),
     );
-  } else {  // no field exists. ask to add one.
+  } 
+  else {  // no field exists. ask to add one.
     $message = t('No boolean fields available. Please add at least one to a !product to identify shippable skus.',
-                    array( '!product' => l('product type','admin/commerce/products/types')));
+                    array( '!product' => l('product type', 'admin/commerce/products/types')));
     drupal_set_message($message, 'warning');
     $form['commerce_delivery_shippable_field'] = array(
       '#type' => 'item',
@@ -466,21 +467,21 @@ function commerce_delivery_get_deliveries($order_id, $limit = 'all') {
 /**
  * Callback that returns delivery_ref allowed values
  */
-function commerce_delivery_ref_allowed_values($item){
-  return array(0,3,4);
+function commerce_delivery_ref_allowed_values($item) {
+  return array(0, 3, 4);
 }
 
 /**
  * Callback that returns delivery_ref default values
  */
-function commerce_delivery_ref_default_value($type,$line_item,$f,$i,$lang){
+function commerce_delivery_ref_default_value($type, $line_item, $f, $i, $lang) {
   return array(array('value' => 0));
 }
 
 /**
  * TODO: use or delete this!
  */
-function commerce_delivery_page_view($delivery, $view_mode = 'full'){
+function commerce_delivery_page_view($delivery, $view_mode = 'full') {
   $delivery->content = array();
   
   $delivery->content += t('Welcome to the administration page for your deliveries!');

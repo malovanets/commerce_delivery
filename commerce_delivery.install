@@ -1,5 +1,9 @@
 <?php
 // $Id$
+/**
+ * @file
+ * Commerce delivery install 
+ */
 
 /**
  * Implements hook_schema().
@@ -50,7 +54,7 @@ function commerce_delivery_schema() {
     'foreign keys' => array(
       'orgder_id' => array(
         'table' => 'commerce_order',
-        'columns'=> array('order_id' => 'order_id'),
+        'columns' => array('order_id' => 'order_id', ),
       ),
     ),
   );

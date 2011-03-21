@@ -153,7 +153,7 @@ function commerce_delivery_order_has_shippable_item($order) {
  * checks to see if the given order has a selected status 
  */
 function commerce_delivery_order_has_status($order, $status_list) {
-  if (in_array($order->status,$status_list)) {
+  if (in_array($order->status, $status_list)) {
     return TRUE;
   }
   return FALSE;
@@ -249,7 +249,7 @@ function commerce_delivery_assign_delivery($line_item) {
 function commerce_delivery_assign_orphans($delivery) {
   // getting shippable items from this order
   $items = views_get_view_result('shippable_items', 'defaults', $delivery->order_id);
-  foreach($items as $item) {
+  foreach ($items as $item) {
     $line_item = current(entity_load('commerce_line_item', array($item->line_item_id)));
     $wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
     // checking if it's orphan

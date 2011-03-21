@@ -2,6 +2,7 @@
 // $Id:$
 
 /**
+ * @file
  * Field handler to select a delivery status.
  */
 class commerce_delivery_handler_field_delivery_status extends views_handler_field {

@@ -1,6 +1,11 @@
 <?php
 // $Id$
 
+/**
+ * @file
+ * Delivery entity controller
+ */
+
 class DeliveryEntityController extends DrupalDefaultEntityController {
 
   /**

@@ -2,6 +2,7 @@
 // $Id: commerce_order_handler_field_order_operations.inc,v 1.3 2010/12/02 06:27:32 rszrama Exp $
 
 /**
+ * @file
  * Field handler to present an order's operations links.
  */
 class commerce_delivery_handler_delivery_action_links extends views_handler_field {
