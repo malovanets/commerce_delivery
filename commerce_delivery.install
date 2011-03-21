@@ -97,7 +97,7 @@ function commerce_delivery_enable() {
  //       'allowed_values' => array(0),
        ),
     );
-    field_create_field($field);    
+    field_create_field($field);
     $instance = array(
       'field_name' => 'delivery_ref',
       'entity_type' => 'commerce_line_item',

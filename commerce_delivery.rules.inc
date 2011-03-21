@@ -144,7 +144,7 @@ function commerce_delivery_order_has_shippable_item($order) {
   $shippables = views_get_view_result('shippable_items', 'defaults', $order->order_id);
   if (count($shippables) == 0) {
     return FALSE;
-  } 
+  }
   return TRUE;
 }
 
