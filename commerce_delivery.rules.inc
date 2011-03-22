@@ -253,7 +253,7 @@ function commerce_delivery_assign_orphans($delivery) {
     $line_item = current(entity_load('commerce_line_item', array($item->line_item_id)));
     $wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
     // checking if it's orphan
-    if ($wrapper->delivery_ref->value() == array('und' => array(0 => array('value' => 0)))) { 
+    if ($wrapper->delivery_ref->value() == 0) { 
       $wrapper->delivery_ref = $delivery->delivery_id;
       commerce_line_item_save($line_item);
     }

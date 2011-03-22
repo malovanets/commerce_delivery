@@ -191,6 +191,18 @@ function commerce_delivery_menu() {
     'weight' => 0,
     'type' => MENU_DEFAULT_LOCAL_TASK,
   );
+  // this is really ugly, but couldn't find a better way.
+  // views can't set a contextual inline tab
+  $items['admin/commerce/orders/%commerce_order/deliveries'] = array(
+    'title' => 'Deliveries',
+    'page callback' => 'commerce_delivery_by_order_view',
+    'page arguments' => array(3),
+    'access callback' => 'commerce_order_access',
+    'access arguments' => array('update', 3),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 0,
+    'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
+  );
   $items['admin/commerce/deliveries/do/%commerce_delivery/view'] = array(
     'title' => 'View',
     'type' => MENU_LOCAL_TASK,
@@ -217,6 +229,25 @@ function commerce_delivery_menu() {
   );
 
   return $items;
+}
+
+/**
+ * Implements hook_menu_breadcrumb_alter(&$active_trail, $item).
+ *
+function commerce_delivery_menu_breadcrumb_alter(&$active_trail, $item) {
+  if ($item['path'] == 'admin/commerce/orders/%/deliveries') {
+    array_pop($active_trail);
+  }
+}
+*/
+/**
+ * Page callback.
+ */
+function commerce_delivery_by_order_view($order) {
+  
+  $views->content = views_embed_view('commerce_delivery_by_order', 'default', $order->order_id);
+  
+  return $views->content;
 }
 
 /**
@@ -345,22 +376,6 @@ function commerce_delivery_add_form_submit($form, &$form_state) {
   $delivery_submission = (object) $form_state['values'];
   field_attach_submit('commerce_delivery', $delivery_submission, $form, $form_state);
   $delivery = commerce_delivery_save($delivery_submission);
-  // verifico se ci sono consegne non assegnate
-  $query = new EntityFieldQuery;
-  $line_items = $query
-  ->entityCondition('entity_type', 'commerce_line_item')
- // ->fieldCondition('delivery_ref', 'value', 1, '<')
-  ->propertyCondition('order_id', $delivery->order_id, '=')
-  ->execute();
-  // assegno eventuali consegne non assegnate
-  foreach ($line_items as $type => $values) {
-      $items = entity_load($type, array_keys($values));
-      foreach ($items as $item) {
-        $wrapper = entity_metadata_wrapper($type, $item);
-        $wrapper->delivery_ref = $delivery->delivery_id;
-        commerce_line_item_save($item);
-      }
-  }
   $form_state['redirect'] = "admin/commerce/deliveries";
 }
 

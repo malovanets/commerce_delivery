@@ -14,6 +14,7 @@ files[] = includes/commerce_delivery.views.inc
 files[] = includes/commerce_delivery_handler_field_delivery_status.inc
 files[] = includes/commerce_delivery_handler_filter_delivery_status.inc
 files[] = includes/commerce_delivery_handler_delivery_action_links.inc
+files[] = includes/commerce_delivery_handler_line_item_set_delivery.inc
 
 ; Tests
 ;files[] = tests/commerce_delivery.test
