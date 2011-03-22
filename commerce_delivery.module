@@ -203,6 +203,15 @@ function commerce_delivery_menu() {
     'weight' => 0,
     'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
   );
+  $items['admin/commerce/orders/%commerce_order/deliveries/%commerce_line_item/%commerce_delivery'] = array(
+    'title' => 'Menu Test Example Form',
+    'page callback' => 'commerce_delivery_move_item',
+    'page arguments' => array(5, 6),
+    'access callback' => 'commerce_order_access',
+    'access arguments' => array('update', 3),
+    'weight' => 10,
+    'type' => MENU_CALLBACK,
+  );
   $items['admin/commerce/deliveries/do/%commerce_delivery/view'] = array(
     'title' => 'View',
     'type' => MENU_LOCAL_TASK,
@@ -240,6 +249,7 @@ function commerce_delivery_menu_breadcrumb_alter(&$active_trail, $item) {
   }
 }
 */
+
 /**
  * Page callback.
  */
@@ -248,6 +258,22 @@ function commerce_delivery_by_order_view($order) {
   $views->content = views_embed_view('commerce_delivery_by_order', 'default', $order->order_id);
   
   return $views->content;
+}
+
+/**
+ * Page callback.
+ */
+function commerce_delivery_move_item($line_item, $delivery) {
+  // TODO a bit of validation
+ // $item = current(entity_load('commerce_line_item', array($line_item->line_item_id)));
+  $wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
+  // setting the deliver ref
+  $wrapper->delivery_ref = $delivery->delivery_id;
+  commerce_line_item_save($line_item);
+  drupal_set_message(t('Item %item has been moved to delivery %delivery', 
+                 array('%item' => $line_item->line_item_id, 
+                       '%delivery' => $delivery->delivery_id)));
+  drupal_goto();
 }
 
 /**

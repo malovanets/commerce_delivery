@@ -135,15 +135,6 @@ function commerce_delivery_views_data() {
     ),
   );
   
-  // Expose links to operate on the delivery.
-  $data['commerce_order']['order_id'] = array(
-    'relationship' => array(
-      'base' => 'commerce_delivery',
-      'field' => 'order_id',
-      'handler' => 'views_handler_relationship',
-    ),
-  );
-
   return $data;
 }
 
