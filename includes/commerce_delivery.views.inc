@@ -117,15 +117,6 @@ function commerce_delivery_views_data() {
     ),
   );
 
-  // Expose links to operate on the delivery.
-  $data['commerce_delivery']['action_links'] = array(
-    'field' => array(
-      'title' => t('Action links'),
-      'help' => t('Provide links to perform actions on each delivery.'),
-      'handler' => 'commerce_delivery_handler_delivery_action_links',
-    ),
-  );
-
   // Expose links to operate on the line item delivery.
   $data['commerce_line_item']['set_delivery'] = array(
     'field' => array(
@@ -134,8 +125,9 @@ function commerce_delivery_views_data() {
       'handler' => 'commerce_delivery_handler_line_item_set_delivery',
     ),
   );
-  
+
   return $data;
+
 }
 
 /**

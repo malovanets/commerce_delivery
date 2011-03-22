@@ -166,7 +166,7 @@ function commerce_delivery_menu() {
     'page callback' => 'commerce_delivery_add',
     'access arguments' => array('commerce_delivery_administer_deliveries'),
     'weight' => 10,
-    'type' => MENU_NORMAL_ITEM,
+    'type' => MENU_CALLBACK,
   );
   $items['admin/commerce/deliveries/add/%order_id'] = array(
     'title' => 'Create a delivery ',
@@ -175,7 +175,7 @@ function commerce_delivery_menu() {
     'page arguments' => array(4),
     'access arguments' => array('commerce_delivery_administer_deliveries'),
     'weight' => 10,
-    'type' => MENU_NORMAL_ITEM,
+    'type' => MENU_CALLBACK,
   );
   $items['admin/commerce/config/delivery'] = array(
     'title' => 'Delivery settings',
@@ -191,7 +191,7 @@ function commerce_delivery_menu() {
     'weight' => 0,
     'type' => MENU_DEFAULT_LOCAL_TASK,
   );
-  // this is really ugly, but couldn't find a better way.
+  // this is ugly, but couldn't find a better way.
   // views can't set a contextual inline tab
   $items['admin/commerce/orders/%commerce_order/deliveries'] = array(
     'title' => 'Deliveries',
@@ -254,9 +254,15 @@ function commerce_delivery_menu_breadcrumb_alter(&$active_trail, $item) {
  * Page callback.
  */
 function commerce_delivery_by_order_view($order) {
-  
-  $views->content = views_embed_view('commerce_delivery_by_order', 'default', $order->order_id);
-  
+  $destination = drupal_get_destination();
+  $views->content = '<ul class="action-links"><li>';
+  $views->content .= l(t('Add delivery'),'admin/commerce/deliveries/add/' . $order->order_id, 
+                        array('query' => $destination));
+
+  $views->content .= '</li></ul>';
+  $views->content .= views_embed_view('commerce_delivery_by_order', 'default', $order->order_id);
+  // should next line go in rules?
+  drupal_set_message(t('A new delivery has been added.'));
   return $views->content;
 }
 
@@ -265,7 +271,6 @@ function commerce_delivery_by_order_view($order) {
  */
 function commerce_delivery_move_item($line_item, $delivery) {
   // TODO a bit of validation
- // $item = current(entity_load('commerce_line_item', array($line_item->line_item_id)));
   $wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
   // setting the deliver ref
   $wrapper->delivery_ref = $delivery->delivery_id;
