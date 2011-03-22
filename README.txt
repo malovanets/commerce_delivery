@@ -5,9 +5,10 @@ Commerce Delivery
 
 Maintainer:  xlyz, xlyz@tiscali.it
 
-Defines features and functions common to the commerce delivery module.
+Provides basic functionalities and admin pages to handle deliveries in Drupal 
+Commerce.
 
-Poject homepage: http://drupal.org/sandbox/xlyz/1099140       (atm sandboxed)
+Poject homepage: http://drupal.org/sandbox/xlyz/1099140   (atm sandboxed)
 
 Issues: http://drupal.org/project/issues/1099140
 
@@ -27,12 +28,13 @@ Installation
 Documentation
 -------------
 
-...
+See below :)
 
 
 TODO
 -----
 
- * admin pages to manage order deliveries (and assign items)
+ * complete admin pages to manage order deliveries
+ * write documentation
  * delivery reference field with own formatters (instead of number_integer)
 
