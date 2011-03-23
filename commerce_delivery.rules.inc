@@ -1,5 +1,4 @@
 <?php
-// $Id$
 
 /**
  * @file
@@ -33,7 +32,7 @@ function commerce_delivery_rules_event_info() {
     'variables' => commerce_delivery_rules_event_variables(t('Deleted delivery')),
     'access callback' => 'commerce_delivery_rules_access',
   );
-*/
+ */
   return $events;
 }
 
@@ -70,8 +69,8 @@ function commerce_delivery_rules_event_variables($label, $unchanged = FALSE, $sk
 }
 
 /**
-* Implements hook_rules_condition_info() 
-*/
+ * Implements hook_rules_condition_info().
+ */
 function commerce_delivery_rules_condition_info() {
   $conditions = array();
 
@@ -137,7 +136,7 @@ function commerce_delivery_rules_condition_info() {
 }
 
 /**
- * Rules condition callback: 
+ * Rules condition callback:
  * checks to see if the given order has shippable items
  */
 function commerce_delivery_order_has_shippable_item($order) {
@@ -149,8 +148,8 @@ function commerce_delivery_order_has_shippable_item($order) {
 }
 
 /**
- * Rules condition callback: 
- * checks to see if the given order has a selected status 
+ * Rules condition callback:
+ * checks to see if the given order has a selected status
  */
 function commerce_delivery_order_has_status($order, $status_list) {
   if (in_array($order->status, $status_list)) {
@@ -160,12 +159,12 @@ function commerce_delivery_order_has_status($order, $status_list) {
 }
 
 /**
- * Rules condition callback: 
+ * Rules condition callback:
  * checks to see if the given line item is shippable
  *
  * @param $line_item
  *
- * @return 
+ * @return
  *   TRUE or FALSE
  */
 function commerce_delivery_item_is_shippable($line_item) {
@@ -174,8 +173,8 @@ function commerce_delivery_item_is_shippable($line_item) {
 }
 
 /**
- * Rules condition callback: 
- * checks to see if the given item is in any delivery 
+ * Rules condition callback:
+ * checks to see if the given item is in any delivery
  */
 function commerce_delivery_item_is_orphan($line_item) {
   // FIXME: find a way to avoid using ['und'][0]['value']
@@ -186,8 +185,8 @@ function commerce_delivery_item_is_orphan($line_item) {
 }
 
 /**
- * Rules condition callback: 
- * checks to see if the given order has delivery with active status 
+ * Rules condition callback:
+ * checks to see if the given order has delivery with active status
  */
 function commerce_delivery_active_delivery_exists($order) {
   // getting this order deliveries.
@@ -199,8 +198,8 @@ function commerce_delivery_active_delivery_exists($order) {
 }
 
 /**
-* Implements hook_rules_action_info() 
-*/
+ * Implements hook_rules_action_info().
+ */
 function commerce_delivery_rules_action_info() {
   $actions = array();
 
@@ -228,11 +227,11 @@ function commerce_delivery_rules_action_info() {
 }
 
 /**
- * Rules action callback: 
+ * Rules action callback:
  * assign line items to order default delivery.
  */
 function commerce_delivery_assign_delivery($line_item) {
-  // getting this order deliveries. 
+  // getting this order deliveries.
   $deliveries = commerce_delivery_get_deliveries($line_item->order_id, 'active');
   // reloading the line item or saving gives error
   $item = current(entity_load('commerce_line_item', array($line_item->line_item_id)));
@@ -243,7 +242,7 @@ function commerce_delivery_assign_delivery($line_item) {
 }
 
 /**
- * Rules action callback: 
+ * Rules action callback:
  * assign orphan line items to order default delivery.
  */
 function commerce_delivery_assign_orphans($delivery) {
@@ -253,7 +252,7 @@ function commerce_delivery_assign_orphans($delivery) {
     $line_item = current(entity_load('commerce_line_item', array($item->line_item_id)));
     $wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
     // checking if it's orphan
-    if ($wrapper->delivery_ref->value() == 0) { 
+    if ($wrapper->delivery_ref->value() == 0) {
       $wrapper->delivery_ref = $delivery->delivery_id;
       commerce_line_item_save($line_item);
     }

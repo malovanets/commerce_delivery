@@ -1,5 +1,4 @@
 <?php
-// $Id$
 
 /**
  * @file
@@ -7,7 +6,7 @@
  */
 
 /**
- * Implements hook_views_data()
+ * Implements hook_views_data().
  */
 function commerce_delivery_views_data() {
   $data = array();
@@ -19,7 +18,7 @@ function commerce_delivery_views_data() {
     'title' => t('Commerce Delivery'),
     'help' => t('Delivery.'),
   );
-  
+
   // Expose the order ID.
   $data['commerce_delivery']['order_id'] = array(
     'title' => t('Order ID'),
@@ -45,7 +44,7 @@ function commerce_delivery_views_data() {
        'field' => 'order_id',
        'handler' => 'views_handler_relationship',
        'label' => t('Order ID'),
-     ),
+    ),
   );
 
   // Expose the delivery id.
@@ -280,9 +279,9 @@ function commerce_delivery_views_default_views() {
     t('Order ID'),
     t('Page'),
   );
-  
+
   $views[$view->name] = $view;
-  
+
   // shippable items view
   $view = new view;
   $view->name = 'shippable_items';
@@ -358,9 +357,9 @@ function commerce_delivery_views_default_views() {
     t('Product'),
     t('All'),
   );
-  
+
   $views[$view->name] = $view;
-  
+
   $view = new view;
   $view->name = 'commerce_delivery_by_order';
   $view->description = '';
@@ -597,8 +596,8 @@ function commerce_delivery_views_default_views() {
     t('Title'),
   );
 
-   $views[$view->name] = $view;
- 
+  $views[$view->name] = $view;
+
   return $views;
 }
 

@@ -1,5 +1,4 @@
 <?php
-// $Id$
 
 /**
  * @file
@@ -40,17 +39,17 @@ function commerce_delivery_permission() {
 function commerce_delivery_entity_info() {
   $return = array(
     'commerce_delivery' => array(
-      'label' => t('Delivery'), 
-      'controller class' => 'DeliveryEntityController', 
-      'base table' => 'commerce_delivery', 
-      'uri callback' => 'commerce_delivery_uri', 
-      'fieldable' => TRUE, 
+      'label' => t('Delivery'),
+      'controller class' => 'DeliveryEntityController',
+      'base table' => 'commerce_delivery',
+      'uri callback' => 'commerce_delivery_uri',
+      'fieldable' => TRUE,
       'token_type' => 'delivery',
       'entity keys' => array(
-        'id' => 'delivery_id', 
+        'id' => 'delivery_id',
         'bundle' => 'type',
-        'label' => 'delivery_id', 
-      ), 
+        'label' => 'delivery_id',
+      ),
       'bundles' => array(
         'commerce_delivery' => array(
           'label' => 'Delivery',
@@ -59,16 +58,16 @@ function commerce_delivery_entity_info() {
             'access arguments' => array('administer deliveries'),
           ),
         ),
-      ), 
+      ),
       'view modes' => array(
         'full' => array(
-          'label' => t('Full Delivery'), 
+          'label' => t('Full Delivery'),
           'custom settings' => FALSE,
-        ), 
+        ),
         'teaser' => array(
-          'label' => t('Teaser'), 
+          'label' => t('Teaser'),
           'custom settings' => TRUE,
-        ), 
+        ),
       ),
       'load_hook' => 'commerce_delivery_load',
       'creation callback' => 'commerce_delivery_new',
@@ -90,15 +89,15 @@ function commerce_delivery_uri($delivery) {
  * Callback creating a new delivery.
  */
 function commerce_delivery_new($values = array()) {
-  return entity_get_controller('commerce_delivery')->create('commerce_delivery'); 
+  return entity_get_controller('commerce_delivery')->create('commerce_delivery');
 }
- 
+
 /**
  * Saves a delivery.
  *
  * @param $delivery
  *   The full delivery object to save. If $delivery->delivery_id is empty, a new delivery
- *     will be created. 
+ *     will be created.
  *
  * @return
  *   The saved delivery object.
@@ -248,7 +247,7 @@ function commerce_delivery_menu_breadcrumb_alter(&$active_trail, $item) {
     array_pop($active_trail);
   }
 }
-*/
+ */
 
 /**
  * Page callback.
@@ -256,13 +255,11 @@ function commerce_delivery_menu_breadcrumb_alter(&$active_trail, $item) {
 function commerce_delivery_by_order_view($order) {
   $destination = drupal_get_destination();
   $views->content = '<ul class="action-links"><li>';
-  $views->content .= l(t('Add delivery'),'admin/commerce/deliveries/add/' . $order->order_id, 
+  $views->content .= l(t('Add delivery'), 'admin/commerce/deliveries/add/' . $order->order_id,
                         array('query' => $destination));
 
   $views->content .= '</li></ul>';
   $views->content .= views_embed_view('commerce_delivery_by_order', 'default', $order->order_id);
-  // should next line go in rules?
-  drupal_set_message(t('A new delivery has been added.'));
   return $views->content;
 }
 
@@ -275,9 +272,9 @@ function commerce_delivery_move_item($line_item, $delivery) {
   // setting the deliver ref
   $wrapper->delivery_ref = $delivery->delivery_id;
   commerce_line_item_save($line_item);
-  drupal_set_message(t('Item %item has been moved to delivery %delivery', 
-                 array('%item' => $line_item->line_item_id, 
-                       '%delivery' => $delivery->delivery_id)));
+  drupal_set_message(t('Item %item has been moved to delivery %delivery',
+    array('%item' => $line_item->line_item_id,
+      '%delivery' => $delivery->delivery_id)));
   drupal_goto();
 }
 
@@ -349,7 +346,7 @@ function commerce_delivery_get_status() {
   $options_array = explode("\n", $options_array);
   foreach ($options_array as $option) {
     $option = explode('|', $option);
-    $options[$option[0]] = t($option[1]); 
+    $options[$option[0]] = t($option[1]);
   }
   return $options;
 }
@@ -407,6 +404,8 @@ function commerce_delivery_add_form_submit($form, &$form_state) {
   $delivery_submission = (object) $form_state['values'];
   field_attach_submit('commerce_delivery', $delivery_submission, $form, $form_state);
   $delivery = commerce_delivery_save($delivery_submission);
+  // should next line go in rules?
+  drupal_set_message(t('A new delivery has been added.'));
   $form_state['redirect'] = "admin/commerce/deliveries";
 }
 
@@ -440,8 +439,8 @@ function commerce_delivery_settings_form($form, &$form_state) {
     '#multiple' => TRUE,
   );
   // Check if a shippable field has been defined
-  $query = db_query('SELECT DISTINCT f.id, f.field_name 
-                            FROM {field_config} f RIGHT JOIN {field_config_instance} i ON f.id = i.field_id 
+  $query = db_query('SELECT DISTINCT f.id, f.field_name
+                            FROM {field_config} f RIGHT JOIN {field_config_instance} i ON f.id = i.field_id
                             WHERE f.type = :type and i.deleted = 0', array(':type' => 'list_boolean'));
   if ($query->rowCount() ) { // select one
     $form['commerce_delivery_shippable_field'] = array(
@@ -451,7 +450,7 @@ function commerce_delivery_settings_form($form, &$form_state) {
       '#options' => $query->fetchAllKeyed(),
       '#default_value' => variable_get('commerce_delivery_shippable_field', ''),
     );
-  } 
+  }
   else {  // no field exists. ask to add one.
     $message = t('No boolean fields available. Please add at least one to a !product to identify shippable skus.',
                     array( '!product' => l('product type', 'admin/commerce/products/types')));
@@ -486,11 +485,11 @@ function commerce_delivery_views_api() {
  * Return deliveries by Order ID
  *
  * @param $order_id
- *   The order ID. 
+ *   The order ID.
  *
  * @param $limit
  *   'active' for retrieving only deliveries with active status
- *   'all' (default) for everything 
+ *   'all' (default) for everything
  *
  * @return
  *   Array of deliveries ID.
@@ -529,7 +528,7 @@ function commerce_delivery_ref_default_value($type, $line_item, $f, $i, $lang) {
  */
 function commerce_delivery_page_view($delivery, $view_mode = 'full') {
   $delivery->content = array();
-  
+
   $delivery->content += t('Welcome to the administration page for your deliveries!');
 
   // Build fields content.

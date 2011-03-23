@@ -1,8 +1,8 @@
 <?php
-// $Id$
+
 /**
  * @file
- * Commerce delivery install 
+ * Commerce delivery install
  */
 
 /**
@@ -95,7 +95,7 @@ function commerce_delivery_enable() {
       'settings' => array(
  //       'allowed_values_function' => 'commerce_delivery_ref_allowed_values',
  //       'allowed_values' => array(0),
-       ),
+      ),
     );
     field_create_field($field);
     $instance = array(

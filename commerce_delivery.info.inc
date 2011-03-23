@@ -25,7 +25,7 @@ function commerce_delivery_entity_property_info() {
     'setter callback' => 'entity_property_verbatim_set',
     'type' => 'text',
     'required' => TRUE,
- );
+  );
   $properties['view_url'] = array(
     'label' => t('View URL'),
     'description' => t('The URL a customer can visit to view the delivery.'),
@@ -69,9 +69,9 @@ function commerce_delivery_entity_property_info() {
 }
 
 /**
-* Implements hook_entity_property_info_alter() 
-* @see entity_metadata_entity_property_info_alter()
-*/
+ * Implements hook_entity_property_info_alter().
+ * @see entity_metadata_entity_property_info_alter()
+ */
 function commerce_delivery_entity_property_info_alter(&$info) {
   $info['commerce_line_item']['properties']['delivery_ref'] = array(
     'label' => t("Delivery ID"),

@@ -1,5 +1,4 @@
 <?php
-// $Id: commerce_order_handler_field_order_operations.inc,v 1.3 2010/12/02 06:27:32 rszrama Exp $
 
 /**
  * @file
@@ -24,9 +23,9 @@ class commerce_delivery_handler_line_item_set_delivery extends views_handler_fie
     $line_item_id = $values->{$this->aliases['line_item_id']};
     $line_item = current(entity_load('commerce_line_item', array($line_item_id)));
     $wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
-    $current_delivery_id = $wrapper->delivery_ref->value(); 
+    $current_delivery_id = $wrapper->delivery_ref->value();
 
-    $deliveries = commerce_delivery_get_deliveries($order_id,'active');
+    $deliveries = commerce_delivery_get_deliveries($order_id, 'active');
     foreach ($deliveries as $type) {
       foreach ($type as $delivery) {
         // FIXME: skip link for current delivery_id

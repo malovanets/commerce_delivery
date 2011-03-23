@@ -1,5 +1,4 @@
 <?php
-// $Id:$
 
 /**
  * @file
@@ -11,5 +10,4 @@ class commerce_delivery_handler_field_delivery_status extends views_handler_fiel
     // Only attempt to render a valid order status.
       return $value;
   }
-  
 }
