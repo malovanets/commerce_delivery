@@ -22,6 +22,6 @@ dependencies[] = entity
 dependencies[] = views
 dependencies[] = commerce_line_item
 
-configure = admin/commerce/deliveries
+configure = admin/commerce/config/delivery
 version = "7.x-1.x-dev"
 
