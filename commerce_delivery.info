@@ -1,6 +1,6 @@
 name = Delivery
 description = Defines the Delivery entity and associated features.
-package = Commerce
+package = Commerce (contrib)
 core = 7.x
 
 ; Base module files
