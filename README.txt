@@ -34,7 +34,6 @@ See below :)
 TODO
 -----
 
- * complete admin pages to manage order deliveries
  * write documentation
  * delivery reference field with own formatters (instead of number_integer)
 

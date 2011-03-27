@@ -9,7 +9,6 @@ files[] = commerce_delivery.install
 
 ; Module includes
 files[] = includes/commerce_delivery.controller.inc
-files[] = includes/commerce_delivery.views.inc
 files[] = includes/commerce_delivery_handler_field_delivery_status.inc
 files[] = includes/commerce_delivery_handler_filter_delivery_status.inc
 files[] = includes/commerce_delivery_handler_line_item_set_delivery.inc
