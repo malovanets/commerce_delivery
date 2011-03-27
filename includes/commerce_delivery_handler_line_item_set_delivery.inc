@@ -26,14 +26,21 @@ class commerce_delivery_handler_line_item_set_delivery extends views_handler_fie
     $current_delivery_id = $wrapper->delivery_ref->value();
 
     $deliveries = commerce_delivery_get_deliveries($order_id, 'active');
+
     foreach ($deliveries as $type) {
       foreach ($type as $delivery) {
-        // FIXME: skip link for current delivery_id
-        $links[$delivery->delivery_id] = array(
-          'title' => $delivery->delivery_id,
-          'href' => 'admin/commerce/orders/' . $order_id . '/deliveries/' . $line_item_id . '/' . $delivery->delivery_id,
-          'query' => $destination,
-    );
+        if ($current_delivery_id == $delivery->delivery_id) {
+          $links[$delivery->delivery_id] = array(
+            'title' => $delivery->delivery_id,
+          );
+        }
+        else {
+          $links[$delivery->delivery_id] = array(
+            'title' => $delivery->delivery_id,
+            'href' => 'admin/commerce/orders/' . $order_id . '/deliveries/' . $line_item_id . '/' . $delivery->delivery_id,
+            'query' => $destination,
+          );
+        }
       }
     }
     if (!empty($links)) {

@@ -34,6 +34,7 @@ See below :)
 TODO
 -----
 
+ * delivery status change button
  * write documentation
  * delivery reference field with own formatters (instead of number_integer)
 

@@ -56,13 +56,13 @@ function commerce_delivery_entity_property_info() {
     'label' => t('Date created'),
     'description' => t('The date the delivery was created.'),
     'type' => 'date',
-    'setter permission' => 'administer deliverys',
+    'setter permission' => 'administer deliveries',
   );
   $properties['changed'] = array(
     'label' => t('Date changed'),
     'description' => t('The date the delivery was most recently updated.'),
     'type' => 'date',
-    'setter permission' => 'administer deliverys',
+    'setter permission' => 'administer deliveries',
   );
 
   return $info;
@@ -77,6 +77,7 @@ function commerce_delivery_entity_property_info_alter(&$info) {
     'label' => t("Delivery ID"),
     'type' => 'integer',
 //    'validation callback' => 'entity_metadata_validate_integer_positive',
+    'getter callback' => 'entity_metadata_field_property_get',
     'setter callback' => 'entity_metadata_field_property_set',
   );
 }
