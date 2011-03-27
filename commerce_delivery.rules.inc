@@ -177,8 +177,7 @@ function commerce_delivery_item_is_shippable($line_item) {
  * checks to see if the given item is in any delivery
  */
 function commerce_delivery_item_is_orphan($line_item) {
-  // FIXME: find a way to avoid using ['und'][0]['value']
-  if ($line_item->delivery_ref['und'][0]['value'] == 0) {
+  if ($line_item->delivery_ref->value() == 0) {
     return TRUE;
   }
   return FALSE;
