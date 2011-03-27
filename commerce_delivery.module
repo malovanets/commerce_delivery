@@ -219,10 +219,11 @@ function commerce_delivery_menu() {
     'weight' => -10,
     'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
   );
-  $items['admin/commerce/deliveries/do/%commerce_delivery/edit'] = array(
+  $items['admin/commerce/deliveries/%commerce_delivery/edit'] = array(
     'title' => 'Edit',
     'type' => MENU_LOCAL_TASK,
-    'page arguments' => array(4),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('commerce_delivery_edit_form', 3),
     'access arguments' => array('commerce_delivery_administer_deliveries'),
     'weight' => -5,
     'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
@@ -237,45 +238,6 @@ function commerce_delivery_menu() {
   );
 
   return $items;
-}
-
-/**
- * Implements hook_menu_breadcrumb_alter(&$active_trail, $item).
- *
-function commerce_delivery_menu_breadcrumb_alter(&$active_trail, $item) {
-  if ($item['path'] == 'admin/commerce/orders/%/deliveries') {
-    array_pop($active_trail);
-  }
-}
- */
-
-/**
- * Page callback.
- */
-function commerce_delivery_by_order_view($order) {
-  $destination = drupal_get_destination();
-  $views->content = '<ul class="action-links"><li>';
-  $views->content .= l(t('Add delivery'), 'admin/commerce/deliveries/add/' . $order->order_id,
-                        array('query' => $destination));
-
-  $views->content .= '</li></ul>';
-  $views->content .= views_embed_view('commerce_delivery_by_order', 'default', $order->order_id);
-  return $views->content;
-}
-
-/**
- * Page callback.
- */
-function commerce_delivery_move_item($line_item, $delivery) {
-  // TODO a bit of validation
-  $wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
-  // setting the deliver ref
-  $wrapper->delivery_ref = $delivery->delivery_id;
-  commerce_line_item_save($line_item);
-  drupal_set_message(t('Item %item has been moved to delivery %delivery',
-    array('%item' => $line_item->line_item_id,
-      '%delivery' => $delivery->delivery_id)));
-  drupal_goto();
 }
 
 /**
@@ -322,11 +284,48 @@ function commerce_delivery_field_extra_fields() {
   return $return;
 }
 
-function commerce_delivery_add($order_id = NULL) {
-// TODO: check order_id
-if ($order_id == '') {
-  return t('Required Order ID missing.');
+/**
+ * Page callback.
+ */
+function commerce_delivery_by_order_view($order) {
+  $destination = drupal_get_destination();
+  $views->content = '<ul class="action-links"><li>';
+  $views->content .= l(t('Add delivery'), 'admin/commerce/deliveries/add/' . $order->order_id,
+                        array('query' => $destination));
+
+  $views->content .= '</li></ul>';
+  $views->content .= views_embed_view('commerce_delivery_by_order', 'default', $order->order_id);
+  return $views->content;
 }
+
+/**
+ * Page callback.
+ */
+function commerce_delivery_move_item($line_item, $delivery) {
+  // TODO a bit of validation
+  $wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
+  // setting the deliver ref
+  $wrapper->delivery_ref = $delivery->delivery_id;
+  commerce_line_item_save($line_item);
+  drupal_set_message(t('Item %item has been moved to delivery %delivery',
+    array('%item' => $line_item->line_item_id,
+      '%delivery' => $delivery->delivery_id)));
+  drupal_goto();
+}
+
+/**
+ * Page callback for adding a new delivery.
+ *
+ * @param $order_id
+ *   ID of the order which to attach the delivery to
+ *
+ * @return
+ */
+function commerce_delivery_add($order_id = NULL) {
+  // TODO: check order_id
+  if ($order_id == '') {
+    return t('Required Order ID missing.');
+  }
   $delivery = (object) array(
     'id' => '',
     'type' => 'delivery',
@@ -371,6 +370,9 @@ function commerce_delivery_status_get_title($id = NULL) {
   return FALSE;
 }
 
+/**
+ * Add new delivery form
+ */
 function commerce_delivery_add_form($form, &$form_state, $delivery) {
   $form['status'] = array(
     '#type' => 'select',
@@ -407,6 +409,56 @@ function commerce_delivery_add_form_submit($form, &$form_state) {
   // should next line go in rules?
   drupal_set_message(t('A new delivery has been added.'));
   $form_state['redirect'] = "admin/commerce/deliveries";
+}
+
+/**
+ * Edit delivery form
+ */
+function commerce_delivery_edit_form($form, &$form_state, $delivery) {
+  $form['view'] = array(
+    '#type' => 'item',
+    '#markup' => views_embed_view('commerce_delivery_view', 'page', $delivery->delivery_id),
+  );
+  $form['status'] = array(
+    '#type' => 'select',
+    '#title' => t('Status'),
+    '#options' => commerce_delivery_get_status(),
+    '#default_value' => $delivery->status,
+    '#required' => TRUE,
+  );
+  $form['delivery_id'] = array(
+    '#type' => 'hidden',
+    '#default_value' => $delivery->delivery_id,
+  );
+  $form['order_id'] = array(
+    '#type' => 'hidden',
+    '#default_value' => $delivery->order_id,
+  );
+  $form['type'] = array(
+    '#type' => 'hidden',
+    '#value' => $delivery->type,
+  );
+  $form['destination'] = array(
+    '#type' => 'hidden',
+    '#value' => drupal_get_destination(),
+  );
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save'),
+  );
+  field_attach_form('commerce_delivery', $delivery, $form, $form_state);
+  return $form;
+}
+
+function commerce_delivery_edit_form_submit($form, &$form_state) {
+  $destination = $form_state['values']['destination'];
+  unset($form_state['values']['destination']);
+  $delivery_submission = (object) $form_state['values'];
+  field_attach_submit('commerce_delivery', $delivery_submission, $form, $form_state);
+  $delivery = commerce_delivery_save($delivery_submission);
+  // should next line go in rules?
+  drupal_set_message(t('Delivery status updated.'));
+  $form_state['redirect'] = $destination;
 }
 
 /**
@@ -521,22 +573,6 @@ function commerce_delivery_ref_allowed_values($item) {
  */
 function commerce_delivery_ref_default_value($type, $line_item, $f, $i, $lang) {
   return array(array('value' => 0));
-}
-
-/**
- * TODO: use or delete this!
- */
-function commerce_delivery_page_view($delivery, $view_mode = 'full') {
-  $delivery->content = array();
-
-  $delivery->content += t('Welcome to the administration page for your deliveries!');
-
-  // Build fields content.
-  field_attach_prepare_view('delivery', array($delivery->id => $delivery), $view_mode);
-  entity_prepare_view('delivery', array($delivery->id => $delivery));
-  $delivery->content += field_attach_view('delivery', $delivery, $view_mode);
-
-  return $delivery->content;
 }
 
 
