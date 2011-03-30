@@ -617,6 +617,87 @@ function commerce_delivery_views_default_views() {
 
   $views[$view->name] = $view;
 
+  $view = new view;
+  $view->name = 'shippable_items';
+  $view->description = '';
+  $view->tag = 'commerce';
+  $view->base_table = 'commerce_line_item';
+  $view->human_name = 'Shippable items';
+  $view->core = 7;
+  $view->api_version = '3.0-alpha1';
+  $view->disabled = FALSE; /* Edit this to true to make a default view disabled initially */
+
+  /* Display: Master */
+  $handler = $view->new_display('default', 'Master', 'default');
+  $handler->display->display_options['access']['type'] = 'none';
+  $handler->display->display_options['cache']['type'] = 'none';
+  $handler->display->display_options['query']['type'] = 'views_query';
+  $handler->display->display_options['exposed_form']['type'] = 'basic';
+  $handler->display->display_options['pager']['type'] = 'full';
+  $handler->display->display_options['style_plugin'] = 'default';
+  $handler->display->display_options['row_plugin'] = 'fields';
+  /* Relationship: Fields: Referenced product */
+  $handler->display->display_options['relationships']['commerce_product_product_id']['id'] = 'commerce_product_product_id';
+  $handler->display->display_options['relationships']['commerce_product_product_id']['table'] = 'field_data_commerce_product';
+  $handler->display->display_options['relationships']['commerce_product_product_id']['field'] = 'commerce_product_product_id';
+  $handler->display->display_options['relationships']['commerce_product_product_id']['required'] = 0;
+  /* Field: Commerce Line Item: Line item ID */
+  $handler->display->display_options['fields']['line_item_id']['id'] = 'line_item_id';
+  $handler->display->display_options['fields']['line_item_id']['table'] = 'commerce_line_item';
+  $handler->display->display_options['fields']['line_item_id']['field'] = 'line_item_id';
+  $handler->display->display_options['fields']['line_item_id']['alter']['alter_text'] = 0;
+  $handler->display->display_options['fields']['line_item_id']['alter']['make_link'] = 0;
+  $handler->display->display_options['fields']['line_item_id']['alter']['absolute'] = 0;
+  $handler->display->display_options['fields']['line_item_id']['alter']['external'] = 0;
+  $handler->display->display_options['fields']['line_item_id']['alter']['replace_spaces'] = 0;
+  $handler->display->display_options['fields']['line_item_id']['alter']['trim'] = 0;
+  $handler->display->display_options['fields']['line_item_id']['alter']['nl2br'] = 0;
+  $handler->display->display_options['fields']['line_item_id']['alter']['word_boundary'] = 1;
+  $handler->display->display_options['fields']['line_item_id']['alter']['ellipsis'] = 1;
+  $handler->display->display_options['fields']['line_item_id']['alter']['strip_tags'] = 0;
+  $handler->display->display_options['fields']['line_item_id']['alter']['html'] = 0;
+  $handler->display->display_options['fields']['line_item_id']['element_label_colon'] = 1;
+  $handler->display->display_options['fields']['line_item_id']['element_default_classes'] = 1;
+  $handler->display->display_options['fields']['line_item_id']['hide_empty'] = 0;
+  $handler->display->display_options['fields']['line_item_id']['empty_zero'] = 0;
+  /* Contextual filter: Commerce Line Item: Order ID */
+  $handler->display->display_options['arguments']['order_id']['id'] = 'order_id';
+  $handler->display->display_options['arguments']['order_id']['table'] = 'commerce_line_item';
+  $handler->display->display_options['arguments']['order_id']['field'] = 'order_id';
+  $handler->display->display_options['arguments']['order_id']['default_action'] = 'empty';
+  $handler->display->display_options['arguments']['order_id']['default_argument_type'] = 'fixed';
+  $handler->display->display_options['arguments']['order_id']['default_argument_skip_url'] = 0;
+  $handler->display->display_options['arguments']['order_id']['summary']['number_of_records'] = '0';
+  $handler->display->display_options['arguments']['order_id']['summary']['format'] = 'default_summary';
+  $handler->display->display_options['arguments']['order_id']['summary_options']['items_per_page'] = '25';
+  $handler->display->display_options['arguments']['order_id']['break_phrase'] = 0;
+  $handler->display->display_options['arguments']['order_id']['not'] = 0;
+  /* Filter criterion: Fields: Shippable (field_shippable) */
+  $handler->display->display_options['filters']['field_shippable_value']['id'] = 'field_shippable_value';
+  $handler->display->display_options['filters']['field_shippable_value']['table'] = 'field_data_field_shippable';
+  $handler->display->display_options['filters']['field_shippable_value']['field'] = 'field_shippable_value';
+  $handler->display->display_options['filters']['field_shippable_value']['relationship'] = 'commerce_product_product_id';
+  $handler->display->display_options['filters']['field_shippable_value']['value'] = array(
+    1 => '1',
+  );
+  $translatables['shippable_items'] = array(
+    t('Master'),
+    t('more'),
+    t('Apply'),
+    t('Reset'),
+    t('Sort by'),
+    t('Asc'),
+    t('Desc'),
+    t('Items per page'),
+    t('- All -'),
+    t('Offset'),
+    t('Product'),
+    t('Line item ID'),
+    t('All'),
+  );
+
+  $views[$view->name] = $view;
+
   return $views;
 }
 

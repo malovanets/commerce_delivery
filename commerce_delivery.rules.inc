@@ -140,7 +140,7 @@ function commerce_delivery_rules_condition_info() {
  * checks to see if the given order has shippable items
  */
 function commerce_delivery_order_has_shippable_item($order) {
-  $shippables = views_get_view_result('shippable_items', 'defaults', $order->order_id);
+  $shippables = views_get_view_result('shippable_items', 'default', $order->order_id);
   if (count($shippables) == 0) {
     return FALSE;
   }
@@ -253,6 +253,10 @@ function commerce_delivery_assign_orphans($delivery) {
     // checking if it's orphan
     if ($wrapper->delivery_ref->value() == 0) {
       $wrapper->delivery_ref = $delivery->delivery_id;
+      // work around to avoid resettin line_item order_id to 0
+      if ($wrapper->order_id->value() == 0) {
+        $wrapper->order_id = $delivery->order_id;
+      }
       commerce_line_item_save($line_item);
     }
   }
