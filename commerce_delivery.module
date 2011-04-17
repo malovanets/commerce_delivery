@@ -211,13 +211,10 @@ function commerce_delivery_menu() {
     'weight' => 10,
     'type' => MENU_CALLBACK,
   );
-  $items['admin/commerce/deliveries/do/%commerce_delivery/view'] = array(
-    'title' => 'View',
-    'type' => MENU_LOCAL_TASK,
-    'page arguments' => array(4),
+  $items['admin/commerce/deliveries/%commerce_delivery'] = array(
+    'page arguments' => array(3),
     'access arguments' => array('commerce_delivery_administer_deliveries'),
     'weight' => -10,
-    'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
   );
   $items['admin/commerce/deliveries/%commerce_delivery/edit'] = array(
     'title' => 'Edit',
@@ -225,7 +222,7 @@ function commerce_delivery_menu() {
     'page callback' => 'drupal_get_form',
     'page arguments' => array('commerce_delivery_edit_form', 3),
     'access arguments' => array('commerce_delivery_administer_deliveries'),
-    'weight' => -5,
+    'weight' => 5,
     'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
   );
   $items['admin/commerce/deliveries/do/%commerce_delivery/delete'] = array(
@@ -250,34 +247,34 @@ function commerce_delivery_field_extra_fields() {
       'delivery_id' => array(
         'label' => t('ID'),
         'description' => t('Delivery ID'),
-         'weight' => 1,
+        'weight' => 1,
       ),
-       'order_id' => array(
+      'order_id' => array(
         'label' => t('OID'),
         'description' => t('Order ID'),
-         'weight' => 1,
+        'weight' => 1,
       ),
-       'status' => array(
+      'status' => array(
         'label' => t('Status'),
         'description' => t('Delivery status'),
-         'weight' => 1,
+        'weight' => 1,
       ),
     ),
     'display' => array(
       'delivery_id' => array(
         'label' => t('ID'),
         'description' => t('Delivery ID'),
-         'weight' => 1,
+        'weight' => 1,
       ),
-       'order_id' => array(
+      'order_id' => array(
         'label' => t('OID'),
         'description' => t('Order ID'),
-         'weight' => 1,
+        'weight' => 1,
       ),
-       'status' => array(
+      'status' => array(
         'label' => t('Status'),
         'description' => t('Delivery status'),
-         'weight' => 1,
+        'weight' => 1,
       ),
     ),
   );
@@ -559,13 +556,6 @@ function commerce_delivery_get_deliveries($order_id, $limit = 'all') {
   $deliveries = $query->propertyOrderBy('status')
         ->execute();
   return $deliveries;
-}
-
-/**
- * Callback that returns delivery_ref allowed values
- */
-function commerce_delivery_ref_allowed_values($item) {
-  return array(0, 3, 4);
 }
 
 /**
