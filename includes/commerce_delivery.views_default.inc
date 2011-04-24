@@ -161,7 +161,6 @@ function commerce_delivery_views_default_views() {
 
   $views[$view->name] = $view;
 
-  // shippable items view
   $view = new view;
   $view->name = 'commerce_delivery_view';
   $view->description = '';
@@ -179,7 +178,11 @@ function commerce_delivery_views_default_views() {
   $handler->display->display_options['access']['perm'] = 'access orders';
   $handler->display->display_options['cache']['type'] = 'none';
   $handler->display->display_options['query']['type'] = 'views_query';
-  $handler->display->display_options['exposed_form']['type'] = 'basic';
+  $handler->display->display_options['exposed_form']['type'] = 'input_required';
+  $handler->display->display_options['exposed_form']['options']['text_input_required'] = array(
+    'value' => 'Select any filter and click on Apply to see results',
+    'format' => 'plain_text',
+  );
   $handler->display->display_options['pager']['type'] = 'full';
   $handler->display->display_options['pager']['options']['items_per_page'] = '25';
   $handler->display->display_options['style_plugin'] = 'table';
@@ -225,7 +228,7 @@ function commerce_delivery_views_default_views() {
   $handler->display->display_options['header']['area']['table'] = 'views';
   $handler->display->display_options['header']['area']['field'] = 'area';
   $handler->display->display_options['header']['area']['empty'] = FALSE;
-  /* Relationship: Fields: Referenced product */
+  /* Relationship: Line item: Referenced product */
   $handler->display->display_options['relationships']['commerce_product_product_id']['id'] = 'commerce_product_product_id';
   $handler->display->display_options['relationships']['commerce_product_product_id']['table'] = 'field_data_commerce_product';
   $handler->display->display_options['relationships']['commerce_product_product_id']['field'] = 'commerce_product_product_id';
@@ -294,7 +297,7 @@ function commerce_delivery_views_default_views() {
   $handler->display->display_options['fields']['quantity']['set_precision'] = 0;
   $handler->display->display_options['fields']['quantity']['precision'] = '0';
   $handler->display->display_options['fields']['quantity']['format_plural'] = 0;
-  /* Field: Fields: Billing information */
+  /* Field: Order: Billing information */
   $handler->display->display_options['fields']['commerce_customer_billing']['id'] = 'commerce_customer_billing';
   $handler->display->display_options['fields']['commerce_customer_billing']['table'] = 'field_data_commerce_customer_billing';
   $handler->display->display_options['fields']['commerce_customer_billing']['field'] = 'commerce_customer_billing';
@@ -315,10 +318,9 @@ function commerce_delivery_views_default_views() {
   $handler->display->display_options['fields']['commerce_customer_billing']['element_default_classes'] = 1;
   $handler->display->display_options['fields']['commerce_customer_billing']['hide_empty'] = 0;
   $handler->display->display_options['fields']['commerce_customer_billing']['empty_zero'] = 0;
-  $handler->display->display_options['fields']['commerce_customer_billing']['click_sort_column'] = 'profile_id';
   $handler->display->display_options['fields']['commerce_customer_billing']['type'] = 'commerce_customer_profile_reference_display';
   $handler->display->display_options['fields']['commerce_customer_billing']['field_api_classes'] = 0;
-  /* Contextual filter: Fields: Delivery id (delivery_ref) */
+  /* Contextual filter: Line item: Delivery id (delivery_ref) */
   $handler->display->display_options['arguments']['delivery_ref_value']['id'] = 'delivery_ref_value';
   $handler->display->display_options['arguments']['delivery_ref_value']['table'] = 'field_data_delivery_ref';
   $handler->display->display_options['arguments']['delivery_ref_value']['field'] = 'delivery_ref_value';
@@ -331,7 +333,7 @@ function commerce_delivery_views_default_views() {
   $handler->display->display_options['arguments']['delivery_ref_value']['summary_options']['items_per_page'] = '25';
   $handler->display->display_options['arguments']['delivery_ref_value']['break_phrase'] = 0;
   $handler->display->display_options['arguments']['delivery_ref_value']['not'] = 0;
-  /* Filter criterion: Fields: Shippable (field_shippable) */
+  /* Filter criterion: Product: Shippable (field_shippable) */
   $handler->display->display_options['filters']['field_shippable_value']['id'] = 'field_shippable_value';
   $handler->display->display_options['filters']['field_shippable_value']['table'] = 'field_data_field_shippable';
   $handler->display->display_options['filters']['field_shippable_value']['field'] = 'field_shippable_value';
@@ -343,6 +345,10 @@ function commerce_delivery_views_default_views() {
   /* Display: Page */
   $handler = $view->new_display('page', 'Page', 'page');
   $handler->display->display_options['path'] = 'admin/commerce/deliveries/%/view';
+  $handler->display->display_options['menu']['type'] = 'tab';
+  $handler->display->display_options['menu']['title'] = 'View';
+  $handler->display->display_options['menu']['weight'] = '0';
+  $handler->display->display_options['tab_options']['weight'] = '0';
   $translatables['commerce_delivery_view'] = array(
     t('Master'),
     t('Commerce delivery view'),
