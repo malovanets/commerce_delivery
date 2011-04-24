@@ -140,11 +140,14 @@ function commerce_delivery_rules_condition_info() {
  * checks to see if the given order has shippable items
  */
 function commerce_delivery_order_has_shippable_item($order) {
-  $shippables = views_get_view_result('shippable_items', 'default', $order->order_id);
-  if (count($shippables) == 0) {
-    return FALSE;
+  $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+  $line_items = $order_wrapper->commerce_line_items->value();
+  foreach ($line_items as $item) {
+    if (commerce_delivery_item_is_shippable($item)) {
+      return TRUE;
+    };
   }
-  return TRUE;
+  return FALSE;
 }
 
 /**
@@ -230,6 +233,7 @@ function commerce_delivery_rules_action_info() {
  * assign line items to order default delivery.
  */
 function commerce_delivery_assign_delivery($line_item) {
+  // TODO: check if line_item has order_id set
   // getting this order deliveries.
   $deliveries = commerce_delivery_get_deliveries($line_item->order_id, 'active');
   // reloading the line item or saving gives error
@@ -246,17 +250,14 @@ function commerce_delivery_assign_delivery($line_item) {
  */
 function commerce_delivery_assign_orphans($delivery) {
   // getting shippable items from this order
-  $items = views_get_view_result('shippable_items', 'defaults', $delivery->order_id);
-  foreach ($items as $item) {
-    $line_item = current(entity_load('commerce_line_item', array($item->line_item_id)));
+  $order = commerce_order_load( $delivery->order_id);
+  $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+  $items = $order_wrapper->commerce_line_items->value();
+  foreach ($items as $line_item) {
     $wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
     // checking if it's orphan
     if ($wrapper->delivery_ref->value() == 0) {
       $wrapper->delivery_ref = $delivery->delivery_id;
-      // work around to avoid resettin line_item order_id to 0
-      if ($wrapper->order_id->value() == 0) {
-        $wrapper->order_id = $delivery->order_id;
-      }
       commerce_line_item_save($line_item);
     }
   }
