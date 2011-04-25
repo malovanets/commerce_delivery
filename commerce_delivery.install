@@ -119,6 +119,8 @@ function commerce_delivery_install() {
 2|delivered
 3|on hold
 4|cancelled');
+  variable_set('commerce_delivery_default_status', 0);
+  variable_set('commerce_delivery_active_status', 0);
 }
 
 
