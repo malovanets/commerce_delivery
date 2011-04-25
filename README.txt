@@ -33,7 +33,7 @@ Documentation
 -------------
 
 This modules create a delivery entity. Each delivery need to be associated to
-an order.
+an order. Each order can have zero, one or multiple deliveries.
 
 A delivery is automatically created on order save if it contains at least one
 shippable item. Further deliveries can be manually added from the deliveries
