@@ -17,9 +17,13 @@ files[] = includes/commerce_delivery_handler_line_item_set_delivery.inc
 ;files[] = tests/commerce_delivery.test
 
 dependencies[] = commerce
+dependencies[] = commerce_line_item
+dependencies[] = commerce_order
+dependencies[] = commerce_product
 dependencies[] = entity
 dependencies[] = views
-dependencies[] = commerce_line_item
+dependencies[] = rules
+
 
 configure = admin/commerce/config/delivery
 version = "7.x-1.x-dev"
