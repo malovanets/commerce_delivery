@@ -85,9 +85,9 @@ function commerce_delivery_field_schema($field) {
 }
 
 /**
- * Implements hook_enable().
+ * Implements hook_install().
  */
-function commerce_delivery_enable() {
+function commerce_delivery_install() {
   if (!field_info_field('delivery_ref')) {
     $field = array(
       'field_name' => 'delivery_ref',
@@ -108,19 +108,14 @@ function commerce_delivery_enable() {
     );
     field_create_instance($instance);
   }
-}
 
-/**
- * Implements hook_install().
- */
-function commerce_delivery_install() {
   variable_set('commerce_delivery_status_options', '0|new
 1|pending
 2|delivered
 3|on hold
 4|cancelled');
   variable_set('commerce_delivery_default_status', 0);
-  variable_set('commerce_delivery_active_status', 0);
+  variable_set('commerce_delivery_active_status', array(0, 1));
 }
 
 
