@@ -47,9 +47,7 @@ customization.
 Wish list
 -----
 
- * delivery status change button
- * delivery note (as pdf)
+ * delivery note as pdf
+ * integration with delivery_shipping
  * delivery reference field with own formatters (instead of number_integer)
- * delivery shipping integration
  
-
