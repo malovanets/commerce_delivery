@@ -26,7 +26,7 @@ function commerce_delivery_entity_property_info() {
     'type' => 'text',
     'required' => TRUE,
   );
-//  not used, maybe in the future 
+//  not used, maybe in the future
 //  $properties['view_url'] = array(
 //    'label' => t('View URL'),
 //    'description' => t('The URL a customer can visit to view the delivery.'),
