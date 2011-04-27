@@ -26,5 +26,4 @@ dependencies[] = rules
 
 
 configure = admin/commerce/config/delivery
-version = "7.x-1.x-dev"
 
