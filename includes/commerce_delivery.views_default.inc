@@ -6,7 +6,7 @@
  */
 function commerce_delivery_views_default_views() {
 
-  $field_id = variable_get('commerce_delivery_shippable_field','');
+  $field_id = variable_get('commerce_delivery_shippable_field', '');
   $field_info = field_info_field_by_id($field_id);
   $field_shippable = $field_info['field_name'];
 
