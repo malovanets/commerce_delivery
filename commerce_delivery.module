@@ -486,20 +486,22 @@ function commerce_delivery_settings_form($form, &$form_state) {
     $form['commerce_delivery_shippable_field'] = array(
       '#type' => 'select',
       '#title' => t('Shippable item field'),
-      '#description' => t('Select the boolean field identifying shippable skus.'),
+      '#description' => t('Select the boolean field identifying shippable skus. Every time a new field is selected do not forget to update the affected views: !by_order and !view. Clearing the !cache should be enough if views has not been customized.', array(
+                '!by_order' => l('deliveries by order', 'admin/structure/views/view/commerce_delivery_by_order/edit'),
+                '!view' => l('delivery view', 'admin/structure/views/view/commerce_delivery_view/edit'),
+                '!cache' => l('cache', 'admin/config/development/performance'))),
       '#options' => $query->fetchAllKeyed(),
       '#default_value' => variable_get('commerce_delivery_shippable_field', ''),
     );
   }
   else {  // no field exists. ask to add one.
-    $message = t('No boolean fields available. Please add at least one to a !product to identify shippable skus.',
-                    array( '!product' => l('product type', 'admin/commerce/products/types')));
-    drupal_set_message($message, 'warning');
     $form['commerce_delivery_shippable_field'] = array(
       '#type' => 'item',
       '#title' => t('Shippable item field'),
-      '#description' => $message,
+      '#description' => t('No boolean fields available. Please add at least one to a !product to identify shippable skus.',
+                    array( '!product' => l('product type', 'admin/commerce/products/types'))),
     );
+    drupal_set_message($form['commerce_delivery_shippable_field']['#description'], 'warning');
   }
   $form['commerce_delivery_help_text'] = array(
     '#type' => 'textarea',

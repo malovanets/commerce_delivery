@@ -5,6 +5,11 @@
  * Implements hook_views_default_views().
  */
 function commerce_delivery_views_default_views() {
+
+  $field_id = variable_get('commerce_delivery_shippable_field','');
+  $field_info = field_info_field_by_id($field_id);
+  $field_shippable = $field_info['field_name'];
+
   $views = array();
 
   $view = new view;
@@ -332,11 +337,11 @@ function commerce_delivery_views_default_views() {
   $handler->display->display_options['arguments']['delivery_ref_value']['break_phrase'] = 0;
   $handler->display->display_options['arguments']['delivery_ref_value']['not'] = 0;
   /* Filter criterion: Product: Shippable (field_shippable) */
-  $handler->display->display_options['filters']['field_shippable_value']['id'] = 'field_shippable_value';
-  $handler->display->display_options['filters']['field_shippable_value']['table'] = 'field_data_field_shippable';
-  $handler->display->display_options['filters']['field_shippable_value']['field'] = 'field_shippable_value';
-  $handler->display->display_options['filters']['field_shippable_value']['relationship'] = 'commerce_product_product_id';
-  $handler->display->display_options['filters']['field_shippable_value']['value'] = array(
+  $handler->display->display_options['filters'][$field_shippable . '_value']['id'] = $field_shippable . '_value';
+  $handler->display->display_options['filters'][$field_shippable . '_value']['table'] = 'field_data_' . $field_shippable;
+  $handler->display->display_options['filters'][$field_shippable . '_value']['field'] = $field_shippable . '_value';
+  $handler->display->display_options['filters'][$field_shippable . '_value']['relationship'] = 'commerce_product_product_id';
+  $handler->display->display_options['filters'][$field_shippable . '_value']['value'] = array(
     1 => '1',
   );
 
@@ -584,11 +589,11 @@ function commerce_delivery_views_default_views() {
   $handler->display->display_options['arguments']['order_id']['break_phrase'] = 0;
   $handler->display->display_options['arguments']['order_id']['not'] = 0;
   /* Filter criterion: Fields: Shippable (field_shippable) */
-  $handler->display->display_options['filters']['field_shippable_value']['id'] = 'field_shippable_value';
-  $handler->display->display_options['filters']['field_shippable_value']['table'] = 'field_data_field_shippable';
-  $handler->display->display_options['filters']['field_shippable_value']['field'] = 'field_shippable_value';
-  $handler->display->display_options['filters']['field_shippable_value']['relationship'] = 'commerce_product_product_id';
-  $handler->display->display_options['filters']['field_shippable_value']['value'] = array(
+  $handler->display->display_options['filters'][$field_shippable . '_value']['id'] = $field_shippable . '_value';
+  $handler->display->display_options['filters'][$field_shippable . '_value']['table'] = 'field_data_' . $field_shippable;
+  $handler->display->display_options['filters'][$field_shippable . '_value']['field'] = $field_shippable . '_value';
+  $handler->display->display_options['filters'][$field_shippable . '_value']['relationship'] = 'commerce_product_product_id';
+  $handler->display->display_options['filters'][$field_shippable . '_value']['value'] = array(
     1 => '1',
   );
   $translatables['commerce_delivery_by_order'] = array(
