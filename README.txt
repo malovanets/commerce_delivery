@@ -43,11 +43,16 @@ from one delivery to the other.
 Views and rules modules are used as much as possible to allow easy 
 customization.
  
+To identify shippable items a boolean field is needed. To avoid duplication
+with other modules, it's not hard coded and can be selected in the config 
+page. Don't forget after a new one is selected to update the views that
+use it: commerce_delivery_by_order and commerce_delivery_view.
+
 
 Wish list
 -----
 
  * delivery note as pdf
- * integration with delivery_shipping
+ * integration with delivery_shipping and delivery_stock
  * delivery reference field with own formatters (instead of number_integer)
  
