@@ -19,6 +19,5 @@ dependencies[] = entity
 dependencies[] = views
 dependencies[] = rules
 
-
 configure = admin/commerce/config/delivery
 

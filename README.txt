@@ -8,10 +8,9 @@ Maintainer:  xlyz, xlyz@tiscali.it
 Provides basic functionalities and admin pages to handle deliveries in Drupal 
 Commerce.
 
-Poject homepage: http://drupal.org/sandbox/xlyz/1099140   (atm sandboxed)
+Poject homepage: http://drupal.org/project/commerce_delivery
 
-Issues: http://drupal.org/project/issues/1099140
-
+Issues: http://drupal.org/project/issues/commerce_delivery
 
 Installation
 ------------
