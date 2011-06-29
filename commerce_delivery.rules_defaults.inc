@@ -16,10 +16,10 @@ function commerce_delivery_default_rules_configuration() {
   $rule->label = 'Add delivery';
   $rule->event('commerce_order_insert')
     ->event('commerce_order_update')
-    ->condition(rules_condition('commerce_delivery_active_delivery_exists', array('order:select' => 'order'))->negate())
-    ->condition('commerce_delivery_order_has_shippable_item', array('order:select' => 'order'))
-    ->condition('commerce_delivery_order_has_status', array('order:select' => 'order', 'status' => array('pending' => 'pending', 'processing' => 'processing')))
-    ->action('entity_create', array('type' => 'commerce_delivery', 'param_order_id:select' => 'order:order_id', 'param_status' => '0'));
+    ->condition(rules_condition('commerce_delivery_active_delivery_exists', array('order:select' => 'commerce-order'))->negate())
+    ->condition('commerce_delivery_order_has_shippable_item', array('order:select' => 'commerce-order'))
+    ->condition('commerce_delivery_order_has_status', array('order:select' => 'commerce-order', 'status' => array('pending' => 'pending', 'processing' => 'processing')))
+    ->action('entity_create', array('type' => 'commerce_delivery', 'param_order_id:select' => 'commerce-order:order_id', 'param_status' => '0'));
   $configs['rules_add_delivery'] = $rule;
 
   $rule = rules_reaction_rule();
