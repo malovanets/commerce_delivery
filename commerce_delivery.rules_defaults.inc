@@ -25,9 +25,9 @@ function commerce_delivery_default_rules_configuration() {
   $rule = rules_reaction_rule();
   $rule->label = 'Assign new line item to delivery';
   $rule->event('commerce_line_item_insert')
-    ->condition('commerce_delivery_item_is_shippable', array('line_item:select' => 'line_item'))
-    ->condition('entity_exists', array('type' => 'commerce_delivery', 'property' => 'order_id', 'value:select' => 'line-item:order-id'))
-    ->action('commerce_delivery_assign_delivery', array('line_item:select' => 'line_item', 'delivery_status' => array('0' , '1')));
+    ->condition('commerce_delivery_item_is_shippable', array('line_item:select' => 'commerce-line-item'))
+    ->condition('entity_exists', array('type' => 'commerce_delivery', 'property' => 'order_id', 'value:select' => 'commerce-line-item:order-id'))
+    ->action('commerce_delivery_assign_delivery', array('line_item:select' => 'commerce-line-item', 'delivery_status' => array('0' , '1')));
   $configs['rules_assign_line_item_to_delivery'] = $rule;
 
   $rule = rules_reaction_rule();
