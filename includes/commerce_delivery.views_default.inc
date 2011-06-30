@@ -28,23 +28,20 @@ function commerce_delivery_views_default_views() {
   $handler->display->display_options['access']['type'] = 'none';
   $handler->display->display_options['cache']['type'] = 'none';
   $handler->display->display_options['query']['type'] = 'views_query';
+  $handler->display->display_options['query']['options']['query_comment'] = FALSE;
   $handler->display->display_options['exposed_form']['type'] = 'basic';
   $handler->display->display_options['pager']['type'] = 'full';
   $handler->display->display_options['style_plugin'] = 'table';
   $handler->display->display_options['style_options']['columns'] = array(
     'delivery_id' => 'delivery_id',
-    'status' => 'status',
     'order_id' => 'order_id',
+    'status' => 'status',
+    'delivery_id_1' => 'delivery_id_1',
+    'delivery_id_2' => 'delivery_id_1',
   );
   $handler->display->display_options['style_options']['default'] = '-1';
   $handler->display->display_options['style_options']['info'] = array(
     'delivery_id' => array(
-      'sortable' => 0,
-      'default_sort_order' => 'asc',
-      'align' => '',
-      'separator' => '',
-    ),
-    'status' => array(
       'sortable' => 0,
       'default_sort_order' => 'asc',
       'align' => '',
@@ -56,9 +53,28 @@ function commerce_delivery_views_default_views() {
       'align' => '',
       'separator' => '',
     ),
+    'status' => array(
+      'sortable' => 0,
+      'default_sort_order' => 'asc',
+      'align' => '',
+      'separator' => '',
+    ),
+    'delivery_id_1' => array(
+      'sortable' => 0,
+      'default_sort_order' => 'asc',
+      'align' => '',
+      'separator' => '&nbsp;&nbsp;&nbsp;',
+    ),
+    'delivery_id_2' => array(
+      'sortable' => 0,
+      'default_sort_order' => 'asc',
+      'align' => '',
+      'separator' => '',
+    ),
   );
   $handler->display->display_options['style_options']['override'] = 1;
   $handler->display->display_options['style_options']['sticky'] = 0;
+  $handler->display->display_options['style_options']['empty_table'] = 0;
   /* Field: Commerce Delivery: Delivery id */
   $handler->display->display_options['fields']['delivery_id']['id'] = 'delivery_id';
   $handler->display->display_options['fields']['delivery_id']['table'] = 'commerce_delivery';
@@ -68,11 +84,11 @@ function commerce_delivery_views_default_views() {
   $handler->display->display_options['fields']['delivery_id']['alter']['path'] = 'admin/commerce/deliveries/[delivery_id]/view';
   $handler->display->display_options['fields']['delivery_id']['alter']['absolute'] = 1;
   $handler->display->display_options['fields']['delivery_id']['alter']['external'] = 0;
-  $handler->display->display_options['fields']['delivery_id']['alter']['trim'] = 0;
   $handler->display->display_options['fields']['delivery_id']['alter']['nl2br'] = 0;
   $handler->display->display_options['fields']['delivery_id']['alter']['word_boundary'] = 1;
   $handler->display->display_options['fields']['delivery_id']['alter']['ellipsis'] = 1;
   $handler->display->display_options['fields']['delivery_id']['alter']['strip_tags'] = 0;
+  $handler->display->display_options['fields']['delivery_id']['alter']['trim'] = 0;
   $handler->display->display_options['fields']['delivery_id']['alter']['html'] = 0;
   $handler->display->display_options['fields']['delivery_id']['element_label_colon'] = 1;
   $handler->display->display_options['fields']['delivery_id']['element_default_classes'] = 1;
@@ -87,11 +103,11 @@ function commerce_delivery_views_default_views() {
   $handler->display->display_options['fields']['order_id']['alter']['path'] = 'admin/commerce/orders/[order_id]/deliveries';
   $handler->display->display_options['fields']['order_id']['alter']['absolute'] = 0;
   $handler->display->display_options['fields']['order_id']['alter']['external'] = 0;
-  $handler->display->display_options['fields']['order_id']['alter']['trim'] = 0;
   $handler->display->display_options['fields']['order_id']['alter']['nl2br'] = 0;
   $handler->display->display_options['fields']['order_id']['alter']['word_boundary'] = 1;
   $handler->display->display_options['fields']['order_id']['alter']['ellipsis'] = 1;
   $handler->display->display_options['fields']['order_id']['alter']['strip_tags'] = 0;
+  $handler->display->display_options['fields']['order_id']['alter']['trim'] = 0;
   $handler->display->display_options['fields']['order_id']['alter']['html'] = 0;
   $handler->display->display_options['fields']['order_id']['element_label_colon'] = 1;
   $handler->display->display_options['fields']['order_id']['element_default_classes'] = 1;
@@ -105,16 +121,64 @@ function commerce_delivery_views_default_views() {
   $handler->display->display_options['fields']['status']['alter']['make_link'] = 0;
   $handler->display->display_options['fields']['status']['alter']['absolute'] = 0;
   $handler->display->display_options['fields']['status']['alter']['external'] = 0;
-  $handler->display->display_options['fields']['status']['alter']['trim'] = 0;
   $handler->display->display_options['fields']['status']['alter']['nl2br'] = 0;
   $handler->display->display_options['fields']['status']['alter']['word_boundary'] = 1;
   $handler->display->display_options['fields']['status']['alter']['ellipsis'] = 1;
   $handler->display->display_options['fields']['status']['alter']['strip_tags'] = 0;
+  $handler->display->display_options['fields']['status']['alter']['trim'] = 0;
   $handler->display->display_options['fields']['status']['alter']['html'] = 0;
   $handler->display->display_options['fields']['status']['element_label_colon'] = 1;
   $handler->display->display_options['fields']['status']['element_default_classes'] = 1;
   $handler->display->display_options['fields']['status']['hide_empty'] = 0;
   $handler->display->display_options['fields']['status']['empty_zero'] = 0;
+  /* Field: Commerce Delivery: Delivery id */
+  $handler->display->display_options['fields']['delivery_id_1']['id'] = 'delivery_id_1';
+  $handler->display->display_options['fields']['delivery_id_1']['table'] = 'commerce_delivery';
+  $handler->display->display_options['fields']['delivery_id_1']['field'] = 'delivery_id';
+  $handler->display->display_options['fields']['delivery_id_1']['label'] = 'Operations';
+  $handler->display->display_options['fields']['delivery_id_1']['alter']['alter_text'] = 1;
+  $handler->display->display_options['fields']['delivery_id_1']['alter']['text'] = 'view';
+  $handler->display->display_options['fields']['delivery_id_1']['alter']['make_link'] = 1;
+  $handler->display->display_options['fields']['delivery_id_1']['alter']['path'] = 'admin/commerce/deliveries/[delivery_id]/view';
+  $handler->display->display_options['fields']['delivery_id_1']['alter']['absolute'] = 0;
+  $handler->display->display_options['fields']['delivery_id_1']['alter']['external'] = 0;
+  $handler->display->display_options['fields']['delivery_id_1']['alter']['replace_spaces'] = 0;
+  $handler->display->display_options['fields']['delivery_id_1']['alter']['trim_whitespace'] = 0;
+  $handler->display->display_options['fields']['delivery_id_1']['alter']['nl2br'] = 0;
+  $handler->display->display_options['fields']['delivery_id_1']['alter']['word_boundary'] = 1;
+  $handler->display->display_options['fields']['delivery_id_1']['alter']['ellipsis'] = 1;
+  $handler->display->display_options['fields']['delivery_id_1']['alter']['strip_tags'] = 0;
+  $handler->display->display_options['fields']['delivery_id_1']['alter']['trim'] = 0;
+  $handler->display->display_options['fields']['delivery_id_1']['alter']['html'] = 0;
+  $handler->display->display_options['fields']['delivery_id_1']['element_label_colon'] = 1;
+  $handler->display->display_options['fields']['delivery_id_1']['element_default_classes'] = 1;
+  $handler->display->display_options['fields']['delivery_id_1']['hide_empty'] = 0;
+  $handler->display->display_options['fields']['delivery_id_1']['empty_zero'] = 0;
+  $handler->display->display_options['fields']['delivery_id_1']['hide_alter_empty'] = 0;
+  /* Field: Commerce Delivery: Delivery id */
+  $handler->display->display_options['fields']['delivery_id_2']['id'] = 'delivery_id_2';
+  $handler->display->display_options['fields']['delivery_id_2']['table'] = 'commerce_delivery';
+  $handler->display->display_options['fields']['delivery_id_2']['field'] = 'delivery_id';
+  $handler->display->display_options['fields']['delivery_id_2']['label'] = '';
+  $handler->display->display_options['fields']['delivery_id_2']['alter']['alter_text'] = 1;
+  $handler->display->display_options['fields']['delivery_id_2']['alter']['text'] = 'edit';
+  $handler->display->display_options['fields']['delivery_id_2']['alter']['make_link'] = 1;
+  $handler->display->display_options['fields']['delivery_id_2']['alter']['path'] = 'admin/commerce/deliveries/[delivery_id]/edit';
+  $handler->display->display_options['fields']['delivery_id_2']['alter']['absolute'] = 0;
+  $handler->display->display_options['fields']['delivery_id_2']['alter']['external'] = 0;
+  $handler->display->display_options['fields']['delivery_id_2']['alter']['replace_spaces'] = 0;
+  $handler->display->display_options['fields']['delivery_id_2']['alter']['trim_whitespace'] = 0;
+  $handler->display->display_options['fields']['delivery_id_2']['alter']['nl2br'] = 0;
+  $handler->display->display_options['fields']['delivery_id_2']['alter']['word_boundary'] = 1;
+  $handler->display->display_options['fields']['delivery_id_2']['alter']['ellipsis'] = 1;
+  $handler->display->display_options['fields']['delivery_id_2']['alter']['strip_tags'] = 0;
+  $handler->display->display_options['fields']['delivery_id_2']['alter']['trim'] = 0;
+  $handler->display->display_options['fields']['delivery_id_2']['alter']['html'] = 0;
+  $handler->display->display_options['fields']['delivery_id_2']['element_label_colon'] = FALSE;
+  $handler->display->display_options['fields']['delivery_id_2']['element_default_classes'] = 1;
+  $handler->display->display_options['fields']['delivery_id_2']['hide_empty'] = 0;
+  $handler->display->display_options['fields']['delivery_id_2']['empty_zero'] = 0;
+  $handler->display->display_options['fields']['delivery_id_2']['hide_alter_empty'] = 0;
   /* Sort criterion: Commerce Delivery: Delivery id */
   $handler->display->display_options['sorts']['delivery_id']['id'] = 'delivery_id';
   $handler->display->display_options['sorts']['delivery_id']['table'] = 'commerce_delivery';
@@ -144,25 +208,6 @@ function commerce_delivery_views_default_views() {
   $handler->display->display_options['tab_options']['description'] = 'Manage deliveries in the store.';
   $handler->display->display_options['tab_options']['weight'] = '0';
   $handler->display->display_options['tab_options']['name'] = 'management';
-  $translatables['commerce_delivery'] = array(
-    t('Defaults'),
-    t('Deliveries'),
-    t('more'),
-    t('Apply'),
-    t('Reset'),
-    t('Sort by'),
-    t('Asc'),
-    t('Desc'),
-    t('Items per page'),
-    t('- All -'),
-    t('Offset'),
-    t('Delivery id'),
-    t('admin/commerce/deliveries/[delivery_id]/view'),
-    t('Order ID'),
-    t('admin/commerce/orders/[order_id]/deliveries'),
-    t('Delivery status'),
-    t('Page'),
-  );
 
   $views[$view->name] = $view;
 
