@@ -82,7 +82,7 @@ function commerce_delivery_entity_property_info_alter(&$info) {
 //    'validation callback' => 'entity_metadata_validate_integer_positive',
     'getter callback' => 'entity_metadata_field_property_get',
     'setter callback' => 'entity_metadata_field_property_set',
-  );dsm($info);
+  );
 }
 
 

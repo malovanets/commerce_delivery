@@ -34,22 +34,23 @@ class CommerceDeliveryEntityController extends DrupalDefaultEntityController {
     // Set the timestamp fields.
     if (empty($delivery->delivery_id)) {
       $delivery->created = REQUEST_TIME;
-##      $op = 'insert';
+      $op = 'insert';
     }
     $delivery->changed = REQUEST_TIME;
 
-##    if ($op == 'insert') {
-##      drupal_write_record('commerce_delivery', $delivery);
-##      field_attach_insert('commerce_delivery', $delivery);
-##    }
-##    else {
-##      drupal_write_record('commerce_delivery', $delivery, 'delivery_id');
-##      field_attach_update('commerce_delivery', $delivery);
-##    }
-##    module_invoke_all('entity_insert', 'commerce_delivery', $delivery);
-##    rules_invoke_event('commerce_delivery_' . $op, $delivery);
+    if ($op == 'insert') {
+      drupal_write_record('commerce_delivery', $delivery);
+      field_attach_insert('commerce_delivery', $delivery);
+    }
+    else {
+      drupal_write_record('commerce_delivery', $delivery, 'delivery_id');
+      field_attach_update('commerce_delivery', $delivery);
+    }
+    module_invoke_all('entity_insert', 'commerce_delivery', $delivery);
+    rules_invoke_event('commerce_delivery_' . $op, $delivery);
 
-    return parent::save($delivery);
+    return $delivery;
+//    return parent::save($delivery);
   }
 }
 

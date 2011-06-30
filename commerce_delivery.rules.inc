@@ -17,13 +17,13 @@ function commerce_delivery_rules_event_info() {
   $events['commerce_delivery_insert'] = array(
     'label' => t('After saving a new delivery'),
     'group' => t('Commerce Delivery'),
-    'variables' => commerce_delivery_rules_event_variables(t('Created delivery'), TRUE),
+    'variables' => entity_rules_events_variables('commerce_delivery', t('Created delivery')),
     'access callback' => 'commerce_delivery_rules_access',
   );
   $events['commerce_delivery_update'] = array(
     'label' => t('After updating an existing delivery'),
     'group' => t('Commerce Delivery'),
-    'variables' => commerce_delivery_rules_event_variables(t('Updated delivery'), TRUE),
+    'variables' => entity_rules_events_variables('commerce_delivery', t('Updated delivery'), TRUE),
     'access callback' => 'commerce_delivery_rules_access',
   );
 /*  $events['commerce_delivery_delete'] = array(
@@ -252,7 +252,7 @@ function commerce_delivery_assign_delivery($line_item) {
  */
 function commerce_delivery_assign_orphans($delivery) {
   // getting shippable items from this order
-  $order = commerce_order_load($delivery->order_id);
+  $order = commerce_order_load($delivery->order_id);dsm(get_defined_vars());
   $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
   $items = $order_wrapper->commerce_line_items->value();
   foreach ($items as $line_item) {
