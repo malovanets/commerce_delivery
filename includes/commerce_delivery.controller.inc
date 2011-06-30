@@ -5,7 +5,7 @@
  * Delivery entity controller
  */
 
-class DeliveryEntityController extends DrupalDefaultEntityController {
+class CommerceDeliveryEntityController extends DrupalDefaultEntityController {
 
   /**
    * Create a default delivery.
@@ -18,15 +18,14 @@ class DeliveryEntityController extends DrupalDefaultEntityController {
    * @return
    *   A line item object with all default fields initialized.
    */
-  public function create($type = 'commerce_delivery', $order_id = 0, $status = 0) {
-    return (object) array(
+  public function create(array $values = array()) {
+    return (object) ($values + array(
       'delivery_id' => '',
-      'order_id' => $order_id,
-      'type' => $type,
-      'status' => $status,
+      'order_id' => 0,
+      'status' => 0,
       'created' => '',
       'changed' => '',
-    );
+    ));
   }
 
   public function save($delivery) {
@@ -35,21 +34,22 @@ class DeliveryEntityController extends DrupalDefaultEntityController {
     // Set the timestamp fields.
     if (empty($delivery->delivery_id)) {
       $delivery->created = REQUEST_TIME;
-      $op = 'insert';
+##      $op = 'insert';
     }
     $delivery->changed = REQUEST_TIME;
 
-    if ($op == 'insert') {
-      drupal_write_record('commerce_delivery', $delivery);
-      field_attach_insert('commerce_delivery', $delivery);
-    }
-    else {
-      drupal_write_record('commerce_delivery', $delivery, 'delivery_id');
-      field_attach_update('commerce_delivery', $delivery);
-    }
-    module_invoke_all('entity_insert', 'commerce_delivery', $delivery);
-    rules_invoke_event('commerce_delivery_' . $op, $delivery);
-    return $delivery;
+##    if ($op == 'insert') {
+##      drupal_write_record('commerce_delivery', $delivery);
+##      field_attach_insert('commerce_delivery', $delivery);
+##    }
+##    else {
+##      drupal_write_record('commerce_delivery', $delivery, 'delivery_id');
+##      field_attach_update('commerce_delivery', $delivery);
+##    }
+##    module_invoke_all('entity_insert', 'commerce_delivery', $delivery);
+##    rules_invoke_event('commerce_delivery_' . $op, $delivery);
+
+    return parent::save($delivery);
   }
 }
 

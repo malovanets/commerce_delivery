@@ -21,8 +21,7 @@ function commerce_delivery_schema() {
       ),
       'order_id' => array(
         'description' => 'The order id.',
-        'type' => 'varchar',
-        'length' => 255,
+        'type' => 'int',
         'not null' => TRUE,
       ),
       'type' => array(
@@ -52,7 +51,7 @@ function commerce_delivery_schema() {
     ),
     'primary key' => array('delivery_id'),
     'foreign keys' => array(
-      'orgder_id' => array(
+      'order_id' => array(
         'table' => 'commerce_order',
         'columns' => array('order_id' => 'order_id', ),
       ),

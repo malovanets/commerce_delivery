@@ -18,13 +18,15 @@ function commerce_delivery_entity_property_info() {
     'label' => t('Delivery ID', array(), array('context' => 'a drupal commerce delivery')),
     'description' => t('The internal numeric ID of the delivery.'),
     'type' => 'integer',
+    'schema field' => 'delivery_id',
   );
   $properties['order_id'] = array(
     'label' => t('Order ID', array(), array('context' => 'a drupal commerce delivery')),
     'description' => t('The Order ID which the delivery belongs to.'),
     'setter callback' => 'entity_property_verbatim_set',
-    'type' => 'text',
+    'type' => 'integer',
     'required' => TRUE,
+    'schema field' => 'order_id',
   );
 //  not used, maybe in the future
 //  $properties['view_url'] = array(
@@ -48,10 +50,10 @@ function commerce_delivery_entity_property_info() {
   $properties['status'] = array(
     'label' => t('Status'),
     'description' => t('The current status of the delivery.'),
-    'type' => 'text',
+    'type' => 'integer',
     'options list' => 'commerce_delivery_get_status',
     'setter callback' => 'entity_property_verbatim_set',
-    'required' => TRUE,
+   'required' => TRUE,
   );
   $properties['created'] = array(
     'label' => t('Date created'),
@@ -80,7 +82,7 @@ function commerce_delivery_entity_property_info_alter(&$info) {
 //    'validation callback' => 'entity_metadata_validate_integer_positive',
     'getter callback' => 'entity_metadata_field_property_get',
     'setter callback' => 'entity_metadata_field_property_set',
-  );
+  );dsm($info);
 }
 
 

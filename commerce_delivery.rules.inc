@@ -252,7 +252,7 @@ function commerce_delivery_assign_delivery($line_item) {
  */
 function commerce_delivery_assign_orphans($delivery) {
   // getting shippable items from this order
-  $order = commerce_order_load( $delivery->order_id);
+  $order = commerce_order_load($delivery->order_id);
   $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
   $items = $order_wrapper->commerce_line_items->value();
   foreach ($items as $line_item) {

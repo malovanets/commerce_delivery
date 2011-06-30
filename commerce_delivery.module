@@ -35,12 +35,12 @@ function commerce_delivery_permission() {
 function commerce_delivery_entity_info() {
   $return = array(
     'commerce_delivery' => array(
-      'label' => t('Delivery'),
-      'controller class' => 'DeliveryEntityController',
+      'label' => t('Commerce Delivery'),
+      'controller class' => 'CommerceDeliveryEntityController',
       'base table' => 'commerce_delivery',
       'uri callback' => 'commerce_delivery_uri',
       'fieldable' => TRUE,
-      'token_type' => 'delivery',
+      'token_type' => 'commerce-delivery',
       'entity keys' => array(
         'id' => 'delivery_id',
         'bundle' => 'type',
@@ -49,10 +49,10 @@ function commerce_delivery_entity_info() {
       'bundles' => array(
         'commerce_delivery' => array(
           'label' => 'Delivery',
-          'admin' => array(
-            'path' => 'admin/commerce/config/delivery',
-            'access arguments' => array('administer deliveries'),
-          ),
+##          'admin' => array(
+##            'path' => 'admin/commerce/config/delivery',
+##            'access arguments' => array('administer deliveries'),
+##          ),
         ),
       ),
       'view modes' => array(
@@ -84,8 +84,12 @@ function commerce_delivery_uri($delivery) {
 /**
  * Callback creating a new delivery.
  */
-function commerce_delivery_new($values = array()) {
-  return entity_get_controller('commerce_delivery')->create('commerce_delivery');
+function commerce_delivery_new($order_id = 0, $status = 0, $type = 'commerce_delivery') {
+  return entity_get_controller('commerce_delivery')->create(array(
+  'type' => $type,
+  'order_id' => $order_id,
+  'status' => $status,
+  ));
 }
 
 /**
@@ -120,9 +124,8 @@ function commerce_delivery_get_properties($order, array $options, $name) {
 /**
  * Loads a delivery by ID.
  */
-function commerce_delivery_load($pid = NULL, $reset = FALSE) {
-  $pids = (isset($pid) ? array($pid) : array());
-  $delivery = commerce_delivery_load_multiple($pids, $reset);
+function commerce_delivery_load($delivery_id) {
+  $delivery = commerce_delivery_load_multiple(array($delivery_id), array());
   return $delivery ? reset($delivery) : FALSE;
 }
 
