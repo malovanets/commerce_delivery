@@ -222,7 +222,7 @@ function commerce_delivery_rules_action_info() {
     'parameter' => array(
       'delivery' => array(
         'type' => 'commerce_delivery',
-        'label' => t('Delivery'),
+        'label' => t('Commerce Delivery'),
       ),
     ),
     'group' => t('Commerce Line Item'),
@@ -252,13 +252,13 @@ function commerce_delivery_assign_delivery($line_item) {
  */
 function commerce_delivery_assign_orphans($delivery) {
   // getting shippable items from this order
-  $order = commerce_order_load($delivery->order_id);dsm(get_defined_vars());
+  $order = commerce_order_load($delivery->order_id);
   $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
   $items = $order_wrapper->commerce_line_items->value();
   foreach ($items as $line_item) {
     $wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
     // checking if it's orphan
-    if ($wrapper->delivery_ref->value() == 0) {
+    if (commerce_delivery_item_is_orphan($wrapper) && commerce_delivery_item_is_shippable($wrapper)) {
       $wrapper->delivery_ref = $delivery->delivery_id;
       commerce_line_item_save($line_item);
     }

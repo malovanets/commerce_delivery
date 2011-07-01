@@ -19,7 +19,8 @@ function commerce_delivery_default_rules_configuration() {
     ->condition(rules_condition('commerce_delivery_active_delivery_exists', array('order:select' => 'commerce-order'))->negate())
     ->condition('commerce_delivery_order_has_shippable_item', array('order:select' => 'commerce-order'))
     ->condition('commerce_delivery_order_has_status', array('order:select' => 'commerce-order', 'status' => array('pending' => 'pending', 'processing' => 'processing')))
-    ->action('entity_create', array('type' => 'commerce_delivery', 'param_order_id:select' => 'commerce-order:order_id', 'param_status' => '0'));
+    ->action('entity_save', array('data:select' => 'commerce-order', 'immediate' => 1))
+    ->action('entity_create', array('type' => 'commerce_delivery', 'param_order_id:select' => 'commerce-order:order-id', 'param_status' => '0'));
   $configs['rules_add_delivery'] = $rule;
 
   $rule = rules_reaction_rule();
@@ -33,7 +34,7 @@ function commerce_delivery_default_rules_configuration() {
   $rule = rules_reaction_rule();
   $rule->label = 'Assign orphan item to new delivery';
   $rule->event('commerce_delivery_insert')
-    ->action('commerce_delivery_assign_orphans', array('delivery:select' => 'delivery', ));
+    ->action('commerce_delivery_assign_orphans', array('delivery:select' => 'commerce-delivery', ));
   $configs['rules_assign_orphan_to_new_delivery'] = $rule;
 
 /*
