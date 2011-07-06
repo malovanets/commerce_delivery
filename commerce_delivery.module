@@ -49,10 +49,10 @@ function commerce_delivery_entity_info() {
       'bundles' => array(
         'commerce_delivery' => array(
           'label' => 'Delivery',
-##          'admin' => array(
-##            'path' => 'admin/commerce/config/delivery',
-##            'access arguments' => array('administer deliveries'),
-##          ),
+          'admin' => array(
+            'path' => 'admin/commerce/config/delivery',
+            'access arguments' => array('administer deliveries'),
+          ),
         ),
       ),
       'view modes' => array(
