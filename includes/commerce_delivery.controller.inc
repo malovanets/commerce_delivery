@@ -46,7 +46,7 @@ class CommerceDeliveryEntityController extends DrupalDefaultEntityController {
       drupal_write_record('commerce_delivery', $delivery, 'delivery_id');
       field_attach_update('commerce_delivery', $delivery);
     }
-    module_invoke_all('entity_insert', 'commerce_delivery', $delivery);
+    module_invoke_all('entity_insert', $delivery, 'commerce_delivery');
     rules_invoke_event('commerce_delivery_' . $op, $delivery);
 
     return $delivery;
