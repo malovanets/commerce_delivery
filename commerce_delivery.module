@@ -562,3 +562,10 @@ function commerce_delivery_ref_default_value($type, $line_item, $f, $i, $lang) {
 }
 
 
+function commerce_delivery_entity_view($entity, $type, $view_mode, $langcode) {
+  if ($type == 'commerce_order') {
+    $entity->content['commerce_delivery_for_order'] = array(
+      '#markup' => views_embed_view('commerce_delivery_for_order', 'default', $entity->order_id),
+    );
+  }
+}
