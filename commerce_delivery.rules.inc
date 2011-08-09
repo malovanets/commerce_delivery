@@ -174,7 +174,10 @@ function commerce_delivery_item_is_shippable($line_item) {
   $field_id = variable_get('commerce_delivery_shippable_field', '');
   $field_info = field_info_field_by_id($field_id);
   $wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
-  return $wrapper->commerce_product->$field_info['field_name']->value();
+  if (isset($wrapper->commerce_product)) {
+    return $wrapper->commerce_product->$field_info['field_name']->value();
+  }
+  return FALSE;
 }
 
 /**
