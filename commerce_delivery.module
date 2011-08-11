@@ -78,7 +78,7 @@ function commerce_delivery_entity_info() {
  * Callback returning delivery url.
  */
 function commerce_delivery_uri($delivery) {
-  return array( 'path' => 'delivery/' . $delivery->id);
+  return array( 'path' => 'admin/commerce/deliveries/' . $delivery->delivery_id . '/view');
 }
 
 /**
