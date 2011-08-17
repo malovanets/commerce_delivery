@@ -18,13 +18,11 @@ function commerce_delivery_rules_event_info() {
     'label' => t('After saving a new delivery'),
     'group' => t('Commerce Delivery'),
     'variables' => entity_rules_events_variables('commerce_delivery', t('Created delivery')),
-    'access callback' => 'commerce_delivery_rules_access',
   );
   $events['commerce_delivery_update'] = array(
     'label' => t('After updating an existing delivery'),
     'group' => t('Commerce Delivery'),
     'variables' => entity_rules_events_variables('commerce_delivery', t('Updated delivery'), TRUE),
-    'access callback' => 'commerce_delivery_rules_access',
   );
 /*  $events['commerce_delivery_delete'] = array(
     'label' => t('After deleting a delivery'),
