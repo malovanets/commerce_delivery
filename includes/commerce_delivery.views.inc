@@ -124,6 +124,35 @@ function commerce_delivery_views_data() {
       'handler' => 'commerce_delivery_handler_line_item_set_delivery',
     ),
   );
+  
+  /* Relate a line item to the delivery */
+  //$data['field_data_delivery_ref']['table']['group'] = t('Commerce Line Item');
+  $data['commerce_line_item']['delivery_ref'] = array(
+    'title' => t('Delivery ID'),
+    'help' => t('The uniquement internal identifier of the associated delivery.'),
+    'field' => array(
+      'handler' => 'commerce_line_item_handler_field_delivery',
+      'click sortable' => TRUE,
+    ),
+    'filter' => array(
+      'handler' => 'views_handler_filter_numeric',
+    ),
+    'sort' => array(
+      'handler' => 'views_handler_sort',
+    ),
+    'argument' => array(
+      'handler' => 'views_handler_argument_numeric',
+      'numeric' => TRUE,
+    ),
+    'relationship' => array(
+      'handler' => 'views_handler_relationship',
+      'base' => 'commerce_delivery',
+      'field' => 'delivery_id',
+      'relationship table' => 'field_data_delivery_ref',
+      'relationship field' => 'delivery_ref_value',
+      'label' => t('Delivery', array(), array('context' => 'a drupal commerce delivery')),
+    )
+  );
 
   return $data;
 
