@@ -10,7 +10,7 @@ files[] = includes/commerce_delivery.controller.inc
 files[] = includes/commerce_delivery_handler_field_delivery_status.inc
 files[] = includes/commerce_delivery_handler_filter_delivery_status.inc
 files[] = includes/commerce_delivery_handler_line_item_set_delivery.inc
-files[] = includes/commerce_line_item_handler_field_delivery.inc
+files[] = includes/commerce_delivery_handler_line_item_delivery.inc
 
 dependencies[] = commerce
 dependencies[] = commerce_line_item

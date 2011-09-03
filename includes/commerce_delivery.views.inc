@@ -131,7 +131,7 @@ function commerce_delivery_views_data() {
     'title' => t('Delivery ID'),
     'help' => t('The uniquement internal identifier of the associated delivery.'),
     'field' => array(
-      'handler' => 'commerce_line_item_handler_field_delivery',
+      'handler' => 'commerce_delivery_handler_field_line_item_delivery',
       'click sortable' => TRUE,
     ),
     'filter' => array(
