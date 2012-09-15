@@ -298,9 +298,10 @@ function commerce_delivery_move_item($line_item, $delivery) {
   // setting the deliver ref
   $wrapper->delivery_ref = $delivery->delivery_id;
   commerce_line_item_save($line_item);
-  drupal_set_message(t('Item %item has been moved to delivery %delivery',
-    array('%item' => $line_item->line_item_id,
-      '%delivery' => $delivery->delivery_id)));
+  drupal_set_message(t('Item %item has been moved to delivery %delivery.', array(
+    '%item' => $line_item->line_item_label,
+    '%delivery' => $delivery->delivery_id,
+  )));
   drupal_goto();
 }
 
