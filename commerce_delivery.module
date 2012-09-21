@@ -219,10 +219,11 @@ function commerce_delivery_menu() {
     'weight' => 5,
     'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
   );
-  $items['admin/commerce/deliveries/do/%commerce_delivery/delete'] = array(
+  $items['admin/commerce/deliveries/%commerce_delivery/delete'] = array(
     'title' => 'Delete',
     'type' => MENU_LOCAL_TASK,
-    'page arguments' => array(4),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('commerce_delivery_page_delete_confirm_form', 3),
     'access arguments' => array('commerce_delivery_administer_deliveries'),
     'weight' => 20,
     'context' => MENU_CONTEXT_INLINE,
@@ -443,6 +444,8 @@ function commerce_delivery_add_form_submit($form, &$form_state) {
  * Edit delivery form
  */
 function commerce_delivery_edit_form($form, &$form_state, $delivery) {
+  $form['#delivery'] = $delivery;
+
   $form['view'] = array(
     '#type' => 'item',
     '#markup' => views_embed_view('commerce_delivery_view', 'page', $delivery->delivery_id),
@@ -470,10 +473,21 @@ function commerce_delivery_edit_form($form, &$form_state, $delivery) {
     '#type' => 'hidden',
     '#value' => drupal_get_destination(),
   );
-  $form['submit'] = array(
+  $form['actions'] = array('#type' => 'actions');
+  $form['actions']['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Save'),
     '#weight' => 40,
+  );
+  // TODO: when this form covers adding deliveries too, this button needs to
+  // be conditional on the delivery not being new.
+  // @see profile2_form() for a pattern to follow.
+  $form['actions']['delete'] = array(
+    '#type' => 'submit',
+    '#value' => t('Delete delivery'),
+    '#weight' => 45,
+    '#limit_validation_errors' => array(),
+    '#submit' => array('commerce_delivery_form_submit_delete')
   );
   field_attach_form('commerce_delivery', $delivery, $form, $form_state);
   return $form;
@@ -488,6 +502,54 @@ function commerce_delivery_edit_form_submit($form, &$form_state) {
   // should next line go in rules?
   drupal_set_message(t('Delivery status updated.'));
   $form_state['redirect'] = $destination;
+}
+
+/**
+ * Delivery form submit handler for the delete button.
+ */
+function commerce_delivery_form_submit_delete($form, &$form_state) {
+  $delivery = $form['#delivery'];
+  $form_state['redirect'] = 'admin/commerce/deliveries/' . $delivery->delivery_id . '/delete';
+}
+
+/**
+ * Confirm form for deleting a profile.
+ *
+ * @param $delivery
+ *  A delivery entity.
+ */
+function commerce_delivery_page_delete_confirm_form($form, &$form_state, $delivery) {
+  $form_state += array('delivery' => $delivery);
+  $confirm_question = t('Are you sure you want to delete delivery @label?', array('@label' => $delivery->delivery_id));
+  $uri = commerce_delivery_uri($delivery);
+  return confirm_form($form, $confirm_question, $uri['path']);
+}
+
+/**
+ * Submit handler for deleting a delivery.
+ */
+function commerce_delivery_page_delete_confirm_form_submit($form, &$form_state) {
+  $delivery = $form_state['delivery'];
+  commerce_delivery_delete($delivery);
+  drupal_set_message(t('Deleted delivery %label.', array('%label' => $delivery->delivery_id)));
+  $form_state['redirect'] = 'admin/commerce/deliveries';
+}
+
+/**
+ * Delete a delivery entity.
+ *
+ * @param $delivery
+ *  The delivery entity to delete.
+ */
+function commerce_delivery_delete($delivery) {
+  module_invoke_all('entity_delete', $delivery, 'commerce_delivery');
+  field_attach_delete('commerce_delivery', $delivery);
+
+  db_delete('commerce_delivery')
+    ->condition('delivery_id', $delivery->delivery_id)
+    ->execute();
+
+  entity_get_controller('commerce_delivery')->resetCache();
 }
 
 /**
