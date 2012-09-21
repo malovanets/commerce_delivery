@@ -30,10 +30,12 @@ class commerce_delivery_handler_line_item_set_delivery extends views_handler_fie
     foreach ($deliveries as $type) {
       foreach ($type as $delivery) {
         if ($current_delivery_id != $delivery->delivery_id) {
+          $query = $destination;
+          $query['token'] = commerce_delivery_get_token($order_id, $line_item_id, $delivery->delivery_id);
           $links[$delivery->delivery_id] = array(
             'title' => $delivery->delivery_id,
-            'href' => 'admin/commerce/orders/' . $order_id . '/deliveries/' . $line_item_id . '/' . $delivery->delivery_id,
-            'query' => $destination,
+            'href' => 'admin/commerce/orders/' . $order_id . '/deliveries/move/' . $line_item_id . '/' . $delivery->delivery_id,
+            'query' => $query,
           );
         }
       }
