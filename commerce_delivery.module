@@ -145,8 +145,8 @@ function commerce_delivery_load($delivery_id) {
  * @return
  *   An array of delivery objects indexed by delivery_id.
  */
-function commerce_delivery_load_multiple($pids = array(), $conditions = array(), $reset = FALSE) {
-  return entity_load('commerce_delivery', $pids, $conditions, $reset);
+function commerce_delivery_load_multiple($delivery_ids = array(), $conditions = array(), $reset = FALSE) {
+  return entity_load('commerce_delivery', $delivery_ids, $conditions, $reset);
 }
 
 /**
