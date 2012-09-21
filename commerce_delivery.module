@@ -593,6 +593,18 @@ function commerce_delivery_get_deliveries($order_id, $limit = 'all') {
 }
 
 /**
+ * Getter callback for Entity API metadata.
+ */
+function commerce_order_get_property_delivery($order, array $options, $name) {
+  $delivery_stubs = commerce_delivery_get_deliveries($order->order_id);
+  if (isset($delivery_stubs['commerce_delivery'])) {
+    $delivery_ids = array_keys($delivery_stubs['commerce_delivery']);
+    return $delivery_ids;
+  }
+  return array();
+}
+
+/**
  * Callback that returns delivery_ref default values
  */
 function commerce_delivery_ref_default_value($type, $line_item, $f, $i, $lang) {

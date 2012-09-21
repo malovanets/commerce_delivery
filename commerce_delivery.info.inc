@@ -76,12 +76,21 @@ function commerce_delivery_entity_property_info() {
  * @see entity_metadata_entity_property_info_alter()
  */
 function commerce_delivery_entity_property_info_alter(&$info) {
+  // Add the delivery ref to the line item.
   $info['commerce_line_item']['properties']['delivery_ref'] = array(
     'label' => t("Delivery ID"),
     'type' => 'integer',
 //    'validation callback' => 'entity_metadata_validate_integer_positive',
     'getter callback' => 'entity_metadata_field_property_get',
     'setter callback' => 'entity_metadata_field_property_set',
+  );
+
+  // Add the list of deliveries to the order.
+  $info['commerce_order']['properties']['commerce_deliveries'] = array(
+    'label' => t('Deliveries'),
+    'description' => t('The deliveries on this order'),
+    'getter callback' => 'commerce_order_get_property_delivery',
+    'type' => 'list<commerce_delivery>',
   );
 }
 
