@@ -575,7 +575,7 @@ function commerce_delivery_views_api() {
  *   'all' (default) for everything
  *
  * @return
- *   Array of deliveries ID.
+ *   Array of entity stubs as returned by EntityFieldQuery::execute().
  */
 function commerce_delivery_get_deliveries($order_id, $limit = 'all') {
   if ($limit == 'active') {
