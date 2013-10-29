@@ -57,6 +57,37 @@ function commerce_delivery_schema() {
       ),
     ),
   );
+  $schema['commerce_delivery_items'] = array(
+    'description' => 'The base table for delivery items.',
+    'fields' => array(
+      'item_id' => array(
+        'type' => 'serial',
+        'not null' => TRUE,
+      ),
+      'delivery_id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+      'order_id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+      'label' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+      'line_item_id' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+      'qty' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array('item_id'),
+  );
   return $schema;
 }
 
@@ -70,9 +101,14 @@ function commerce_delivery_field_schema($field) {
         'description' => 'Delivery ID.',
         'type' => 'int',
       ),
+      'delivery_qty' => array(
+        'description' => 'Delivery quantity.',
+        'type' => 'int',
+      ),
     ),
     'indexes' => array(
       'delivery_ref' => array('delivery_ref'),
+      'delivery_qty' => array('delivery_qty'),
     ),
     'foreign keys' => array(
       'delivery_id' => array(
@@ -123,6 +159,7 @@ function commerce_delivery_install() {
  */
 function commerce_delivery_uninstall() {
   field_delete_field('delivery_ref');
+  field_delete_field('delivery_qty');
   variable_del('commerce_delivery_status_options');
   variable_del('commerce_delivery_default_status');
   variable_del('commerce_delivery_active_status');

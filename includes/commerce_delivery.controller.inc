@@ -29,7 +29,6 @@ class CommerceDeliveryEntityController extends DrupalDefaultEntityController {
   }
 
   public function save($delivery) {
-
     $op = 'update';
     // Set the timestamp fields.
     if (empty($delivery->delivery_id)) {
@@ -52,7 +51,13 @@ class CommerceDeliveryEntityController extends DrupalDefaultEntityController {
     return $delivery;
 //    return parent::save($delivery);
   }
+
+  public function saveItem($item) {
+    db_delete('commerce_delivery_items')
+    ->condition('delivery_id', $item['delivery_id'])
+    ->condition('line_item_id', $item['line_item_id'])
+    ->execute();
+
+    drupal_write_record('commerce_delivery_items', $item);
+  }
 }
-
-
-
