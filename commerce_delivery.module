@@ -247,7 +247,7 @@ function commerce_delivery_menu() {
     'title' => 'Delete',
     'type' => MENU_LOCAL_TASK,
     'page callback' => 'drupal_get_form',
-    'page arguments' => array('c  ', 3),
+    'page arguments' => array('commerce_delivery_page_delete_confirm_form', 3),
     'access arguments' => array('commerce_delivery_administer_deliveries'),
     'weight' => 20,
     'context' => MENU_CONTEXT_INLINE,
@@ -348,7 +348,8 @@ function commerce_delivery_by_order_view($order) {
         '#header' => $header,
         '#rows' => $rows,
     );
-  } else {
+  }
+  else {
     drupal_set_message(t('No deliveries created yet'), 'warning');
   }
 
@@ -535,6 +536,16 @@ function commerce_delivery_add_form_submit($form, &$form_state) {
   drupal_goto('admin/commerce/orders/' . $form['order_id']['#value'] . '/deliveries');
 }
 
+/**
+ * Validation on the quantity fields.
+ *
+ * @param array $data
+ *   The values coming from the submitted form.
+ * @param string $redirect
+ *   The path for return if the validation is unsuccessful.
+ * @param bool $errors
+ *   Preset condition. Should I put this var inside the function or leave as a param?
+ */
 function commerce_delivery_validate_qty($data, $redirect, $errors = false) {
   $order = commerce_order_load($data['order_id']);
 
@@ -557,11 +568,11 @@ function commerce_delivery_validate_qty($data, $redirect, $errors = false) {
     $max = $line_item->quantity - $result->total;
 
     if ($data['qty_' . $line['line_item_id']] > $max) {
-      $errors = drupal_set_message(t('The maximum quantity for %l is %q', array('%q' => $max, '%l' => $line_item->line_item_label)), 'error');
+      $errors = (bool)drupal_set_message(t('The maximum quantity for %l is %q', array('%q' => $max, '%l' => $line_item->line_item_label)), 'error');
     }
 
     if ($data['qty_' . $line['line_item_id']] < 0) {
-      $errors = drupal_set_message(t('Enter a valid quantity'), 'error');
+      $errors = (bool)drupal_set_message(t('Enter a valid quantity'), 'error');
     }
   }
 
@@ -654,6 +665,12 @@ function commerce_delivery_edit_form_submit($form, &$form_state) {
 
 /**
  * Returns an array of items selected by delivery ID.
+ *
+ * @param int delivery_id
+ *   The delivery ID to get items.
+ *
+ * @return array
+ *   Array of items and their fields.
  */
 function commerce_delivery_get_items($delivery_id) {
   return db_select('commerce_delivery_items', 'cdi')
