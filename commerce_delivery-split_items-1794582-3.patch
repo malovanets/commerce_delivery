@@ -1,0 +1,373 @@
+diff --git a/commerce_delivery.install b/commerce_delivery.install
+index 918f985..e56b2ae 100644
+--- a/commerce_delivery.install
++++ b/commerce_delivery.install
+@@ -57,6 +57,37 @@ function commerce_delivery_schema() {
+       ),
+     ),
+   );
++  $schema['commerce_delivery_items'] = array(
++    'description' => 'The base table for delivery items.',
++    'fields' => array(
++      'item_id' => array(
++        'type' => 'serial',
++        'not null' => TRUE,
++      ),
++      'delivery_id' => array(
++        'type' => 'int',
++        'not null' => TRUE,
++      ),
++      'order_id' => array(
++        'type' => 'int',
++        'not null' => TRUE,
++      ),
++      'label' => array(
++        'type' => 'varchar',
++        'length' => 255,
++        'not null' => TRUE,
++      ),
++      'line_item_id' => array(
++        'type' => 'int',
++        'not null' => TRUE,
++      ),
++      'qty' => array(
++        'type' => 'int',
++        'not null' => TRUE,
++      ),
++    ),
++    'primary key' => array('item_id'),
++  );
+   return $schema;
+ }
+ 
+@@ -70,9 +101,14 @@ function commerce_delivery_field_schema($field) {
+         'description' => 'Delivery ID.',
+         'type' => 'int',
+       ),
++      'delivery_qty' => array(
++        'description' => 'Delivery quantity.',
++        'type' => 'int',
++      ),
+     ),
+     'indexes' => array(
+       'delivery_ref' => array('delivery_ref'),
++      'delivery_qty' => array('delivery_qty'),
+     ),
+     'foreign keys' => array(
+       'delivery_id' => array(
+@@ -123,6 +159,7 @@ function commerce_delivery_install() {
+  */
+ function commerce_delivery_uninstall() {
+   field_delete_field('delivery_ref');
++  field_delete_field('delivery_qty');
+   variable_del('commerce_delivery_status_options');
+   variable_del('commerce_delivery_default_status');
+   variable_del('commerce_delivery_active_status');
+diff --git a/commerce_delivery.module b/commerce_delivery.module
+index 342145d..25e7c23 100644
+--- a/commerce_delivery.module
++++ b/commerce_delivery.module
+@@ -103,7 +103,31 @@ function commerce_delivery_new($order_id = 0, $status = 0, $type = 'commerce_del
+  *   The saved delivery object.
+  */
+ function commerce_delivery_save($delivery) {
+-  return entity_get_controller('commerce_delivery')->save($delivery);
++  $controller = entity_get_controller('commerce_delivery');
++
++  $new = empty($delivery->delivery_id);
++
++  $delivery = $controller->save($delivery);
++
++  foreach ($delivery as $key => $value) {
++    if (strpos($key ,'qty_') === 0) {
++      $exp = explode('_', $key);
++
++      $line_item = commerce_line_item_load(end($exp));
++
++      $item = array(
++        'line_item_id' => $line_item->line_item_id,
++        'label' => $line_item->line_item_label,
++        'qty' => $delivery->{$key},
++        'order_id' => $delivery->order_id,
++        'delivery_id' => $delivery->delivery_id,
++      );
++
++      $controller->saveItem($item, $new);
++    }
++  }
++
++  return $delivery;
+ }
+ 
+ /**
+@@ -223,7 +247,7 @@ function commerce_delivery_menu() {
+     'title' => 'Delete',
+     'type' => MENU_LOCAL_TASK,
+     'page callback' => 'drupal_get_form',
+-    'page arguments' => array('commerce_delivery_page_delete_confirm_form', 3),
++    'page arguments' => array('c  ', 3),
+     'access arguments' => array('commerce_delivery_administer_deliveries'),
+     'weight' => 20,
+     'context' => MENU_CONTEXT_INLINE,
+@@ -280,14 +304,60 @@ function commerce_delivery_field_extra_fields() {
+  * Page callback.
+  */
+ function commerce_delivery_by_order_view($order) {
+-  $destination = drupal_get_destination();
+-  $views->content = '<ul class="action-links"><li>';
+-  $views->content .= l(t('Add delivery'), 'admin/commerce/deliveries/add/' . $order->order_id,
+-                        array('query' => $destination));
++  $query = new EntityFieldQuery();
++
++  $header = array(t('Delivery ID'), t('Items'), t('Status'), t('Date created'), t('Date updated'), t('Actions'));
++
++  $rows = array();
++
++  $status = commerce_delivery_get_status();
++
++  $results = $query->entityCondition('entity_type', 'commerce_delivery')
++  ->propertyCondition('order_id', $order->order_id)
++  ->execute();
++
++  if ($results) {
++    foreach ($results['commerce_delivery'] as $key => $result) {
++      $items = array();
++
++      $result = current(entity_load('commerce_delivery', array($key)));
+ 
+-  $views->content .= '</li></ul>';
+-  $views->content .= views_embed_view('commerce_delivery_by_order', 'default', $order->order_id);
+-  return $views->content;
++      $items_data = commerce_delivery_get_items($key);
++
++      if ($items_data) {
++        foreach ($items_data as $delivery_item) {
++          $line_item = commerce_line_item_load($delivery_item->line_item_id);
++          $items[] = $delivery_item->qty . '/' . round($line_item->quantity) . ' x ' . $line_item->line_item_label;
++        }
++      }
++
++      $rows[$key] = array(
++        'delivery_id' => $key,
++        'items' => empty($items) ? t('None') : implode('<br/>', $items),
++        'status' => $status[$result->status],
++        'created' => date('d.m.Y', $result->created),
++        'updated' => date('d.m.Y', $result->changed),
++        'actions' => l(t('Edit'), 'admin/commerce/deliveries/' . $key . '/edit') . '&nbsp;&nbsp;&nbsp;&nbsp;' . l(t('Delete'), 'admin/commerce/deliveries/' . $key . '/delete'),
++      );
++    }
++
++    $output['table'] = array(
++        '#theme' => 'table',
++        '#header' => $header,
++        '#rows' => $rows,
++    );
++  } else {
++    drupal_set_message(t('No deliveries created yet'), 'warning');
++  }
++
++  $output['actions'] = array(
++    '#attributes' => array('class' => array('action-links')),
++    '#items' => array(l(t('Add delivery'), 'admin/commerce/deliveries/add/' . $order->order_id)),
++    '#theme' => 'item_list',
++    '#weight' => -10,
++  );
++
++  return $output;
+ }
+ 
+ /**
+@@ -322,7 +392,7 @@ function commerce_delivery_move_item($order, $line_item, $delivery) {
+     '%item' => $line_item->line_item_label,
+     '%delivery' => $delivery->delivery_id,
+   )));
+-  drupal_goto();
++  drupal_goto('admin/commerce/orders/' . $order->order_id . '/deliveries');
+ }
+ 
+ /**
+@@ -418,6 +488,28 @@ function commerce_delivery_add_form($form, &$form_state, $delivery) {
+     '#type' => 'hidden',
+     '#value' => 'commerce_delivery',
+   );
++
++  $form['items'] = array(
++  	'#type' => 'fieldset',
++    '#title' => t('Items quantity'),
++    '#description' => t('Enter the quantity of items you want to add to this delivery or leave as is to include all the items <br/><br/>'),
++  );
++
++  $order = commerce_order_load($delivery->order_id);
++
++  foreach ($order->commerce_line_items[LANGUAGE_NONE] as $line) {
++    $line_item = commerce_line_item_load($line['line_item_id']);
++
++    if ($line_item->type == 'product') {
++      $form['items']['qty_' . $line['line_item_id']] = array(
++        '#type' => 'textfield',
++        '#title' => $line_item->line_item_label,
++        '#default_value' => round($line_item->quantity),
++        '#size' => 5,
++      );
++    }
++  }
++
+   $form['submit'] = array(
+     '#type' => 'submit',
+     '#value' => t('Save'),
+@@ -427,6 +519,7 @@ function commerce_delivery_add_form($form, &$form_state, $delivery) {
+ }
+ 
+ function commerce_delivery_add_form_validate($form, &$form_state) {
++  commerce_delivery_validate_qty($form_state['values'], 'admin/commerce/deliveries/add/' . $form_state['values']['order_id']);
+   $delivery_submission = (object) $form_state['values'];
+   field_attach_form_validate('commerce_delivery', $delivery_submission, $form, $form_state);
+ }
+@@ -437,7 +530,22 @@ function commerce_delivery_add_form_submit($form, &$form_state) {
+   $delivery = commerce_delivery_save($delivery_submission);
+   // should next line go in rules?
+   drupal_set_message(t('A new delivery has been added.'));
+-  $form_state['redirect'] = "admin/commerce/deliveries";
++  drupal_goto('admin/commerce/orders/' . $form['order_id']['#value'] . '/deliveries');
++}
++
++function commerce_delivery_validate_qty($data, $redirect, $errors = false) {
++  $order = commerce_order_load($data['order_id']);
++
++  foreach ($order->commerce_line_items[LANGUAGE_NONE] as $line) {
++    $line_item = commerce_line_item_load($line['line_item_id']);
++    if ($data['qty_' . $line['line_item_id']] > $line_item->quantity) {
++      $errors = drupal_set_message(t('The maximum quantity for %l is %q', array('%q' => round($line_item->quantity), '%l' => $line_item->line_item_label)), 'error');
++    }
++  }
++
++  if ($errors) {
++    drupal_goto($redirect);
++  }
+ }
+ 
+ /**
+@@ -456,6 +564,7 @@ function commerce_delivery_edit_form($form, &$form_state, $delivery) {
+     '#options' => commerce_delivery_get_status(),
+     '#default_value' => $delivery->status,
+     '#required' => TRUE,
++    '#weight' => -10,
+   );
+   $form['delivery_id'] = array(
+     '#type' => 'hidden',
+@@ -469,6 +578,23 @@ function commerce_delivery_edit_form($form, &$form_state, $delivery) {
+     '#type' => 'hidden',
+     '#value' => $delivery->type,
+   );
++
++  $form['items'] = array(
++      '#type' => 'fieldset',
++      '#weight' => 10,
++      '#title' => t('Items quantity'),
++      '#description' => t('Enter the quantity of items you want to add to this delivery or leave as is to include all the items <br/><br/>'),
++  );
++
++  foreach (commerce_delivery_get_items($delivery->delivery_id) as $item) {
++    $form['items']['qty_' . $item->line_item_id] = array(
++      '#type' => 'textfield',
++      '#title' => $item->label,
++      '#default_value' => $item->qty,
++      '#size' => 5,
++    );
++  }
++
+   $form['destination'] = array(
+     '#type' => 'hidden',
+     '#value' => drupal_get_destination(),
+@@ -494,14 +620,25 @@ function commerce_delivery_edit_form($form, &$form_state, $delivery) {
+ }
+ 
+ function commerce_delivery_edit_form_submit($form, &$form_state) {
+-  $destination = $form_state['values']['destination'];
+-  unset($form_state['values']['destination']);
++  commerce_delivery_validate_qty($form_state['values'], 'admin/commerce/deliveries/' . $form_state['values']['delivery_id'] . '/edit');
++
+   $delivery_submission = (object) $form_state['values'];
+   field_attach_submit('commerce_delivery', $delivery_submission, $form, $form_state);
+   $delivery = commerce_delivery_save($delivery_submission);
+   // should next line go in rules?
+-  drupal_set_message(t('Delivery status updated.'));
+-  $form_state['redirect'] = $destination;
++  drupal_set_message(t('Delivery information updated.'));
++  $form_state['redirect'] = 'admin/commerce/orders/' . $form['order_id']['#value'] . '/deliveries';
++}
++
++/**
++ * Returns an array of items selected by delivery ID.
++ */
++function commerce_delivery_get_items($delivery_id) {
++  return db_select('commerce_delivery_items', 'cdi')
++  ->fields('cdi')
++  ->condition('delivery_id', $delivery_id, '=')
++  ->execute()
++  ->fetchAll();
+ }
+ 
+ /**
+@@ -532,7 +669,7 @@ function commerce_delivery_page_delete_confirm_form_submit($form, &$form_state)
+   $delivery = $form_state['delivery'];
+   commerce_delivery_delete($delivery);
+   drupal_set_message(t('Deleted delivery %label.', array('%label' => $delivery->delivery_id)));
+-  $form_state['redirect'] = 'admin/commerce/deliveries';
++  $form_state['redirect'] = 'admin/commerce/orders/' . $delivery->order_id . '/deliveries';
+ }
+ 
+ /**
+@@ -549,6 +686,10 @@ function commerce_delivery_delete($delivery) {
+     ->condition('delivery_id', $delivery->delivery_id)
+     ->execute();
+ 
++  db_delete('commerce_delivery_items')
++    ->condition('delivery_id', $delivery->delivery_id)
++    ->execute();
++
+   entity_get_controller('commerce_delivery')->resetCache();
+ }
+ 
+@@ -673,6 +814,13 @@ function commerce_delivery_ref_default_value($type, $line_item, $f, $i, $lang) {
+   return array(array('value' => 0));
+ }
+ 
++/**
++ * Callback that returns delivery_qty default values
++ */
++function commerce_delivery_qty_default_value($type, $line_item, $f, $i, $lang) {
++  return array(array('value' => 0));
++}
++
+ 
+ function commerce_delivery_entity_view($entity, $type, $view_mode, $langcode) {
+   if ($type == 'commerce_order') {
+diff --git a/includes/commerce_delivery.controller.inc b/includes/commerce_delivery.controller.inc
+index d1244c8..56da372 100644
+--- a/includes/commerce_delivery.controller.inc
++++ b/includes/commerce_delivery.controller.inc
+@@ -29,7 +29,6 @@ class CommerceDeliveryEntityController extends DrupalDefaultEntityController {
+   }
+ 
+   public function save($delivery) {
+-
+     $op = 'update';
+     // Set the timestamp fields.
+     if (empty($delivery->delivery_id)) {
+@@ -52,7 +51,13 @@ class CommerceDeliveryEntityController extends DrupalDefaultEntityController {
+     return $delivery;
+ //    return parent::save($delivery);
+   }
+-}
+-
+ 
++  public function saveItem($item) {
++    db_delete('commerce_delivery_items')
++    ->condition('delivery_id', $item['delivery_id'])
++    ->condition('line_item_id', $item['line_item_id'])
++    ->execute();
+ 
++    drupal_write_record('commerce_delivery_items', $item);
++  }
++}

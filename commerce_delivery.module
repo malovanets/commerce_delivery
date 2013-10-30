@@ -326,8 +326,10 @@ function commerce_delivery_by_order_view($order) {
 
       if ($items_data) {
         foreach ($items_data as $delivery_item) {
-          $line_item = commerce_line_item_load($delivery_item->line_item_id);
-          $items[] = $delivery_item->qty . '/' . round($line_item->quantity) . ' x ' . $line_item->line_item_label;
+          if ($delivery_item->qty) {
+            $line_item = commerce_line_item_load($delivery_item->line_item_id);
+            $items[] = $delivery_item->qty . '/' . round($line_item->quantity) . ' x ' . $line_item->line_item_label;
+          }
         }
       }
 
@@ -481,11 +483,11 @@ function commerce_delivery_add_form($form, &$form_state, $delivery) {
     '#required' => TRUE,
   );
   $form['order_id'] = array(
-    '#type' => 'hidden',
+    '#type' => 'value',
     '#default_value' => $delivery->order_id,
   );
   $form['type'] = array(
-    '#type' => 'hidden',
+    '#type' => 'value',
     '#value' => 'commerce_delivery',
   );
 
@@ -538,8 +540,28 @@ function commerce_delivery_validate_qty($data, $redirect, $errors = false) {
 
   foreach ($order->commerce_line_items[LANGUAGE_NONE] as $line) {
     $line_item = commerce_line_item_load($line['line_item_id']);
-    if ($data['qty_' . $line['line_item_id']] > $line_item->quantity) {
-      $errors = drupal_set_message(t('The maximum quantity for %l is %q', array('%q' => round($line_item->quantity), '%l' => $line_item->line_item_label)), 'error');
+
+    $query = db_select('commerce_delivery_items', 'cdi')
+      ->fields('cdi', array('qty'))
+      ->condition('order_id', $data['order_id'], '=')
+      ->condition('line_item_id', $line['line_item_id'], '=');
+
+    if (isset($data['delivery_id'])) {
+      $query->condition('delivery_id', $data['delivery_id'], '!=');
+    }
+
+    $query->addExpression('SUM(qty)', 'total');
+
+    $result = $query->execute()->fetch();
+
+    $max = $line_item->quantity - $result->total;
+
+    if ($data['qty_' . $line['line_item_id']] > $max) {
+      $errors = drupal_set_message(t('The maximum quantity for %l is %q', array('%q' => $max, '%l' => $line_item->line_item_label)), 'error');
+    }
+
+    if ($data['qty_' . $line['line_item_id']] < 0) {
+      $errors = drupal_set_message(t('Enter a valid quantity'), 'error');
     }
   }
 
@@ -567,15 +589,15 @@ function commerce_delivery_edit_form($form, &$form_state, $delivery) {
     '#weight' => -10,
   );
   $form['delivery_id'] = array(
-    '#type' => 'hidden',
+    '#type' => 'value',
     '#default_value' => $delivery->delivery_id,
   );
   $form['order_id'] = array(
-    '#type' => 'hidden',
+    '#type' => 'value',
     '#default_value' => $delivery->order_id,
   );
   $form['type'] = array(
-    '#type' => 'hidden',
+    '#type' => 'value',
     '#value' => $delivery->type,
   );
 
@@ -596,7 +618,7 @@ function commerce_delivery_edit_form($form, &$form_state, $delivery) {
   }
 
   $form['destination'] = array(
-    '#type' => 'hidden',
+    '#type' => 'value',
     '#value' => drupal_get_destination(),
   );
   $form['actions'] = array('#type' => 'actions');
