@@ -220,15 +220,6 @@ function commerce_delivery_menu() {
     'weight' => 0,
     'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
   );
-  $items['admin/commerce/orders/%commerce_order/deliveries/move/%commerce_line_item/%commerce_delivery'] = array(
-    'title' => 'Move line item to a delivery',
-    'page callback' => 'commerce_delivery_move_item',
-    'page arguments' => array(3, 6, 7),
-    'access callback' => 'commerce_order_access',
-    'access arguments' => array('update', 3),
-    'weight' => 10,
-    'type' => MENU_CALLBACK,
-  );
   $items['admin/commerce/deliveries/%commerce_delivery'] = array(
     'page arguments' => array(3),
     'access arguments' => array('commerce_delivery_administer_deliveries'),
@@ -361,41 +352,6 @@ function commerce_delivery_by_order_view($order) {
   );
 
   return $output;
-}
-
-/**
- * Page callback for moving a line item to a delivery.
- *
- * @param $order
- *  The order entity.
- * @param $line_item
- *  The line item entity.
- * @param $delivery
- *  The delivery entity.
- */
-function commerce_delivery_move_item($order, $line_item, $delivery) {
-  // Validate the token from the link.
-  $token = $_REQUEST['token'];
-  if ($token != commerce_delivery_get_token($order->order_id, $line_item->line_item_id, $delivery->delivery_id)) {
-    drupal_set_message(t('Invalid token.'), 'error');
-    return drupal_access_denied();
-  }
-
-  // Validate that the line item belongs to the order.
-  if ($line_item->order_id != $order->order_id) {
-    drupal_set_message(t('Invalid parameters.'), 'error');
-    return drupal_access_denied();
-  }
-
-  $wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
-  // setting the deliver ref
-  $wrapper->delivery_ref = $delivery->delivery_id;
-  commerce_line_item_save($line_item);
-  drupal_set_message(t('Item %item has been moved to delivery %delivery.', array(
-    '%item' => $line_item->line_item_label,
-    '%delivery' => $delivery->delivery_id,
-  )));
-  drupal_goto('admin/commerce/orders/' . $order->order_id . '/deliveries');
 }
 
 /**
@@ -537,7 +493,7 @@ function commerce_delivery_add_form_submit($form, &$form_state) {
 }
 
 /**
- * Validation on the quantity fields.
+ * Validation on the quantity fields. The quantity could not be more than total items in the order minus the amount of recently shipped items.
  *
  * @param array $data
  *   The values coming from the submitted form.
@@ -652,9 +608,11 @@ function commerce_delivery_edit_form($form, &$form_state, $delivery) {
   return $form;
 }
 
-function commerce_delivery_edit_form_submit($form, &$form_state) {
+function commerce_delivery_edit_form_validate($form, &$form_state) {
   commerce_delivery_validate_qty($form_state['values'], 'admin/commerce/deliveries/' . $form_state['values']['delivery_id'] . '/edit');
+}
 
+function commerce_delivery_edit_form_submit($form, &$form_state) {
   $delivery_submission = (object) $form_state['values'];
   field_attach_submit('commerce_delivery', $delivery_submission, $form, $form_state);
   $delivery = commerce_delivery_save($delivery_submission);
@@ -852,14 +810,6 @@ function commerce_order_get_property_delivery($order, array $options, $name) {
 function commerce_delivery_ref_default_value($type, $line_item, $f, $i, $lang) {
   return array(array('value' => 0));
 }
-
-/**
- * Callback that returns delivery_qty default values
- */
-function commerce_delivery_qty_default_value($type, $line_item, $f, $i, $lang) {
-  return array(array('value' => 0));
-}
-
 
 function commerce_delivery_entity_view($entity, $type, $view_mode, $langcode) {
   if ($type == 'commerce_order') {
