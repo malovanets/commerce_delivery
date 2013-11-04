@@ -297,10 +297,6 @@ function commerce_delivery_field_extra_fields() {
 function commerce_delivery_by_order_view($order) {
   $query = new EntityFieldQuery();
 
-  $header = array(t('Delivery ID'), t('Items'), t('Status'), t('Date created'), t('Date updated'), t('Actions'));
-
-  $rows = array();
-
   $status = commerce_delivery_get_status();
 
   $results = $query->entityCondition('entity_type', 'commerce_delivery')
@@ -357,12 +353,14 @@ function commerce_delivery_add($order_id = NULL) {
   if ($order_id == '') {
     return t('Required Order ID missing.');
   }
-  $delivery = (object) array(
+
+  $delivery = array(
     'id' => '',
-    'type' => 'delivery',
+    'type' => 'commerce_delivery',
     'order_id' => $order_id,
   );
-  return drupal_get_form('commerce_delivery_add_form', $delivery);
+
+  return drupal_get_form('commerce_delivery_add_form', (object)$delivery);
 }
 
 /**
@@ -405,12 +403,20 @@ function commerce_delivery_status_get_title($id = NULL) {
  * Add new delivery form
  */
 function commerce_delivery_add_form($form, &$form_state, $delivery) {
+  $help = variable_get('commerce_delivery_help_text', '');
+  if ($help) {
+    $form['help'] = array(
+      '#type' => 'markup',
+      '#markup' => '<p>' . $help . '</p>',
+    );
+  }
   $form['status'] = array(
     '#type' => 'select',
     '#title' => t('Status'),
     '#options' => commerce_delivery_get_status(),
     '#default_value' => variable_get('commerce_delivery_default_status', ''),
     '#required' => TRUE,
+    '#weight' => -10,
   );
   $form['order_id'] = array(
     '#type' => 'value',
@@ -424,6 +430,7 @@ function commerce_delivery_add_form($form, &$form_state, $delivery) {
   $form['items'] = array(
   	'#type' => 'fieldset',
     '#title' => t('Items quantity'),
+    '#weight' => 10,
     '#description' => t('Enter the quantity of items you want to add to this delivery or leave as is to include all the items <br/><br/>'),
   );
 
@@ -442,11 +449,14 @@ function commerce_delivery_add_form($form, &$form_state, $delivery) {
     }
   }
 
-  $form['submit'] = array(
-    '#type' => 'submit',
-    '#value' => t('Save'),
-  );
   field_attach_form('commerce_delivery', $delivery, $form, $form_state);
+
+  $form['submit'] = array(
+      '#type' => 'submit',
+      '#value' => t('Save'),
+      '#weight' => 100,
+  );
+
   return $form;
 }
 
@@ -460,7 +470,6 @@ function commerce_delivery_add_form_submit($form, &$form_state) {
   $delivery_submission = (object) $form_state['values'];
   field_attach_submit('commerce_delivery', $delivery_submission, $form, $form_state);
   $delivery = commerce_delivery_save($delivery_submission);
-  // should next line go in rules?
   drupal_set_message(t('A new delivery has been added.'));
   drupal_goto('admin/commerce/orders/' . $form['order_id']['#value'] . '/deliveries');
 }
@@ -576,16 +585,7 @@ function commerce_delivery_edit_form($form, &$form_state, $delivery) {
     '#value' => t('Save'),
     '#weight' => 40,
   );
-  // TODO: when this form covers adding deliveries too, this button needs to
-  // be conditional on the delivery not being new.
-  // @see profile2_form() for a pattern to follow.
-  $form['actions']['delete'] = array(
-    '#type' => 'submit',
-    '#value' => t('Delete delivery'),
-    '#weight' => 45,
-    '#limit_validation_errors' => array(),
-    '#submit' => array('commerce_delivery_form_submit_delete')
-  );
+
   field_attach_form('commerce_delivery', $delivery, $form, $form_state);
   return $form;
 }
@@ -672,10 +672,16 @@ function commerce_delivery_action_info() {
   return $actions;
 }
 
+/*
+ * A callback for bulk delete deliveries.
+ */
 function commerce_delivery_action_delete($delivery, $context) {
   commerce_delivery_delete($delivery);
 }
 
+/*
+ * Defines a form to select status when bulk update.
+ */
 function commerce_delivery_action_edit_status_form($delivery, $context) {
   $options = array();
 
@@ -692,6 +698,9 @@ function commerce_delivery_action_edit_status_form($delivery, $context) {
   return $form;
 }
 
+/*
+ * Submit handler for bulk update status.
+ */
 function commerce_delivery_action_edit_status_submit($form, $context) {
   $controller = entity_get_controller('commerce_delivery');
 
@@ -762,10 +771,7 @@ function commerce_delivery_settings_form($form, &$form_state) {
     $form['commerce_delivery_shippable_field'] = array(
       '#type' => 'select',
       '#title' => t('Shippable item field'),
-      '#description' => t('Select the boolean field identifying shippable skus. Every time a new field is selected do not forget to update the affected views: !by_order and !view. Clearing the !cache should be enough if views has not been customized.', array(
-                '!by_order' => l('deliveries by order', 'admin/structure/views/view/commerce_delivery_by_order/edit'),
-                '!view' => l('delivery view', 'admin/structure/views/view/commerce_delivery_view/edit'),
-                '!cache' => l('cache', 'admin/config/development/performance'))),
+      '#description' => t('Select the boolean field identifying shippable skus.'),
       '#options' => $query->fetchAllKeyed(),
       '#default_value' => variable_get('commerce_delivery_shippable_field', ''),
     );

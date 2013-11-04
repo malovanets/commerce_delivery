@@ -1,0 +1,2738 @@
+diff --git a/commerce_delivery-split_items-1794582-7.patch b/commerce_delivery-split_items-1794582-7.patch
+new file mode 100644
+index 0000000..489e53f
+--- /dev/null
++++ b/commerce_delivery-split_items-1794582-7.patch
+@@ -0,0 +1,459 @@
++diff --git a/commerce_delivery.install b/commerce_delivery.install
++index 918f985..e56b2ae 100644
++--- a/commerce_delivery.install
+++++ b/commerce_delivery.install
++@@ -57,6 +57,37 @@ function commerce_delivery_schema() {
++       ),
++     ),
++   );
+++  $schema['commerce_delivery_items'] = array(
+++    'description' => 'The base table for delivery items.',
+++    'fields' => array(
+++      'item_id' => array(
+++        'type' => 'serial',
+++        'not null' => TRUE,
+++      ),
+++      'delivery_id' => array(
+++        'type' => 'int',
+++        'not null' => TRUE,
+++      ),
+++      'order_id' => array(
+++        'type' => 'int',
+++        'not null' => TRUE,
+++      ),
+++      'label' => array(
+++        'type' => 'varchar',
+++        'length' => 255,
+++        'not null' => TRUE,
+++      ),
+++      'line_item_id' => array(
+++        'type' => 'int',
+++        'not null' => TRUE,
+++      ),
+++      'qty' => array(
+++        'type' => 'int',
+++        'not null' => TRUE,
+++      ),
+++    ),
+++    'primary key' => array('item_id'),
+++  );
++   return $schema;
++ }
++ 
++@@ -70,9 +101,14 @@ function commerce_delivery_field_schema($field) {
++         'description' => 'Delivery ID.',
++         'type' => 'int',
++       ),
+++      'delivery_qty' => array(
+++        'description' => 'Delivery quantity.',
+++        'type' => 'int',
+++      ),
++     ),
++     'indexes' => array(
++       'delivery_ref' => array('delivery_ref'),
+++      'delivery_qty' => array('delivery_qty'),
++     ),
++     'foreign keys' => array(
++       'delivery_id' => array(
++@@ -123,6 +159,7 @@ function commerce_delivery_install() {
++  */
++ function commerce_delivery_uninstall() {
++   field_delete_field('delivery_ref');
+++  field_delete_field('delivery_qty');
++   variable_del('commerce_delivery_status_options');
++   variable_del('commerce_delivery_default_status');
++   variable_del('commerce_delivery_active_status');
++diff --git a/commerce_delivery.module b/commerce_delivery.module
++index 342145d..89748c9 100644
++--- a/commerce_delivery.module
+++++ b/commerce_delivery.module
++@@ -103,7 +103,31 @@ function commerce_delivery_new($order_id = 0, $status = 0, $type = 'commerce_del
++  *   The saved delivery object.
++  */
++ function commerce_delivery_save($delivery) {
++-  return entity_get_controller('commerce_delivery')->save($delivery);
+++  $controller = entity_get_controller('commerce_delivery');
+++
+++  $new = empty($delivery->delivery_id);
+++
+++  $delivery = $controller->save($delivery);
+++
+++  foreach ($delivery as $key => $value) {
+++    if (strpos($key ,'qty_') === 0) {
+++      $exp = explode('_', $key);
+++
+++      $line_item = commerce_line_item_load(end($exp));
+++
+++      $item = array(
+++        'line_item_id' => $line_item->line_item_id,
+++        'label' => $line_item->line_item_label,
+++        'qty' => $delivery->{$key},
+++        'order_id' => $delivery->order_id,
+++        'delivery_id' => $delivery->delivery_id,
+++      );
+++
+++      $controller->saveItem($item, $new);
+++    }
+++  }
+++
+++  return $delivery;
++ }
++ 
++ /**
++@@ -196,15 +220,6 @@ function commerce_delivery_menu() {
++     'weight' => 0,
++     'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
++   );
++-  $items['admin/commerce/orders/%commerce_order/deliveries/move/%commerce_line_item/%commerce_delivery'] = array(
++-    'title' => 'Move line item to a delivery',
++-    'page callback' => 'commerce_delivery_move_item',
++-    'page arguments' => array(3, 6, 7),
++-    'access callback' => 'commerce_order_access',
++-    'access arguments' => array('update', 3),
++-    'weight' => 10,
++-    'type' => MENU_CALLBACK,
++-  );
++   $items['admin/commerce/deliveries/%commerce_delivery'] = array(
++     'page arguments' => array(3),
++     'access arguments' => array('commerce_delivery_administer_deliveries'),
++@@ -280,49 +295,63 @@ function commerce_delivery_field_extra_fields() {
++  * Page callback.
++  */
++ function commerce_delivery_by_order_view($order) {
++-  $destination = drupal_get_destination();
++-  $views->content = '<ul class="action-links"><li>';
++-  $views->content .= l(t('Add delivery'), 'admin/commerce/deliveries/add/' . $order->order_id,
++-                        array('query' => $destination));
+++  $query = new EntityFieldQuery();
++ 
++-  $views->content .= '</li></ul>';
++-  $views->content .= views_embed_view('commerce_delivery_by_order', 'default', $order->order_id);
++-  return $views->content;
++-}
+++  $header = array(t('Delivery ID'), t('Items'), t('Status'), t('Date created'), t('Date updated'), t('Actions'));
++ 
++-/**
++- * Page callback for moving a line item to a delivery.
++- *
++- * @param $order
++- *  The order entity.
++- * @param $line_item
++- *  The line item entity.
++- * @param $delivery
++- *  The delivery entity.
++- */
++-function commerce_delivery_move_item($order, $line_item, $delivery) {
++-  // Validate the token from the link.
++-  $token = $_REQUEST['token'];
++-  if ($token != commerce_delivery_get_token($order->order_id, $line_item->line_item_id, $delivery->delivery_id)) {
++-    drupal_set_message(t('Invalid token.'), 'error');
++-    return drupal_access_denied();
++-  }
+++  $rows = array();
+++
+++  $status = commerce_delivery_get_status();
+++
+++  $results = $query->entityCondition('entity_type', 'commerce_delivery')
+++  ->propertyCondition('order_id', $order->order_id)
+++  ->execute();
+++
+++  if ($results) {
+++    foreach ($results['commerce_delivery'] as $key => $result) {
+++      $items = array();
+++
+++      $result = current(entity_load('commerce_delivery', array($key)));
+++
+++      $items_data = commerce_delivery_get_items($key);
+++
+++      if ($items_data) {
+++        foreach ($items_data as $delivery_item) {
+++          if ($delivery_item->qty) {
+++            $line_item = commerce_line_item_load($delivery_item->line_item_id);
+++            $items[] = $delivery_item->qty . '/' . round($line_item->quantity) . ' x ' . $line_item->line_item_label;
+++          }
+++        }
+++      }
++ 
++-  // Validate that the line item belongs to the order.
++-  if ($line_item->order_id != $order->order_id) {
++-    drupal_set_message(t('Invalid parameters.'), 'error');
++-    return drupal_access_denied();
+++      $rows[$key] = array(
+++        'delivery_id' => $key,
+++        'items' => empty($items) ? t('None') : implode('<br/>', $items),
+++        'status' => $status[$result->status],
+++        'created' => date('d.m.Y', $result->created),
+++        'updated' => date('d.m.Y', $result->changed),
+++        'actions' => l(t('Edit'), 'admin/commerce/deliveries/' . $key . '/edit') . '&nbsp;&nbsp;&nbsp;&nbsp;' . l(t('Delete'), 'admin/commerce/deliveries/' . $key . '/delete'),
+++      );
+++    }
+++
+++    $output['table'] = array(
+++        '#theme' => 'table',
+++        '#header' => $header,
+++        '#rows' => $rows,
+++    );
++   }
+++  else {
+++    drupal_set_message(t('No deliveries created yet'), 'warning');
+++  }
+++
+++  $output['actions'] = array(
+++    '#attributes' => array('class' => array('action-links')),
+++    '#items' => array(l(t('Add delivery'), 'admin/commerce/deliveries/add/' . $order->order_id)),
+++    '#theme' => 'item_list',
+++    '#weight' => -10,
+++  );
++ 
++-  $wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
++-  // setting the deliver ref
++-  $wrapper->delivery_ref = $delivery->delivery_id;
++-  commerce_line_item_save($line_item);
++-  drupal_set_message(t('Item %item has been moved to delivery %delivery.', array(
++-    '%item' => $line_item->line_item_label,
++-    '%delivery' => $delivery->delivery_id,
++-  )));
++-  drupal_goto();
+++  return $output;
++ }
++ 
++ /**
++@@ -411,13 +440,35 @@ function commerce_delivery_add_form($form, &$form_state, $delivery) {
++     '#required' => TRUE,
++   );
++   $form['order_id'] = array(
++-    '#type' => 'hidden',
+++    '#type' => 'value',
++     '#default_value' => $delivery->order_id,
++   );
++   $form['type'] = array(
++-    '#type' => 'hidden',
+++    '#type' => 'value',
++     '#value' => 'commerce_delivery',
++   );
+++
+++  $form['items'] = array(
+++  	'#type' => 'fieldset',
+++    '#title' => t('Items quantity'),
+++    '#description' => t('Enter the quantity of items you want to add to this delivery or leave as is to include all the items <br/><br/>'),
+++  );
+++
+++  $order = commerce_order_load($delivery->order_id);
+++
+++  foreach ($order->commerce_line_items[LANGUAGE_NONE] as $line) {
+++    $line_item = commerce_line_item_load($line['line_item_id']);
+++
+++    if ($line_item->type == 'product') {
+++      $form['items']['qty_' . $line['line_item_id']] = array(
+++        '#type' => 'textfield',
+++        '#title' => $line_item->line_item_label,
+++        '#default_value' => round($line_item->quantity),
+++        '#size' => 5,
+++      );
+++    }
+++  }
+++
++   $form['submit'] = array(
++     '#type' => 'submit',
++     '#value' => t('Save'),
++@@ -427,6 +478,7 @@ function commerce_delivery_add_form($form, &$form_state, $delivery) {
++ }
++ 
++ function commerce_delivery_add_form_validate($form, &$form_state) {
+++  commerce_delivery_validate_qty($form_state['values'], 'admin/commerce/deliveries/add/' . $form_state['values']['order_id']);
++   $delivery_submission = (object) $form_state['values'];
++   field_attach_form_validate('commerce_delivery', $delivery_submission, $form, $form_state);
++ }
++@@ -437,7 +489,52 @@ function commerce_delivery_add_form_submit($form, &$form_state) {
++   $delivery = commerce_delivery_save($delivery_submission);
++   // should next line go in rules?
++   drupal_set_message(t('A new delivery has been added.'));
++-  $form_state['redirect'] = "admin/commerce/deliveries";
+++  drupal_goto('admin/commerce/orders/' . $form['order_id']['#value'] . '/deliveries');
+++}
+++
+++/**
+++ * Validation on the quantity fields. The quantity could not be more than total items in the order minus the amount of recently shipped items.
+++ *
+++ * @param array $data
+++ *   The values coming from the submitted form.
+++ * @param string $redirect
+++ *   The path for return if the validation is unsuccessful.
+++ * @param bool $errors
+++ *   Preset condition. Should I put this var inside the function or leave as a param?
+++ */
+++function commerce_delivery_validate_qty($data, $redirect, $errors = false) {
+++  $order = commerce_order_load($data['order_id']);
+++
+++  foreach ($order->commerce_line_items[LANGUAGE_NONE] as $line) {
+++    $line_item = commerce_line_item_load($line['line_item_id']);
+++
+++    $query = db_select('commerce_delivery_items', 'cdi')
+++      ->fields('cdi', array('qty'))
+++      ->condition('order_id', $data['order_id'], '=')
+++      ->condition('line_item_id', $line['line_item_id'], '=');
+++
+++    if (isset($data['delivery_id'])) {
+++      $query->condition('delivery_id', $data['delivery_id'], '!=');
+++    }
+++
+++    $query->addExpression('SUM(qty)', 'total');
+++
+++    $result = $query->execute()->fetch();
+++
+++    $max = $line_item->quantity - $result->total;
+++
+++    if ($data['qty_' . $line['line_item_id']] > $max) {
+++      $errors = (bool)drupal_set_message(t('The maximum quantity for %l is %q', array('%q' => $max, '%l' => $line_item->line_item_label)), 'error');
+++    }
+++
+++    if ($data['qty_' . $line['line_item_id']] < 0) {
+++      $errors = (bool)drupal_set_message(t('Enter a valid quantity'), 'error');
+++    }
+++  }
+++
+++  if ($errors) {
+++    drupal_goto($redirect);
+++  }
++ }
++ 
++ /**
++@@ -456,21 +553,39 @@ function commerce_delivery_edit_form($form, &$form_state, $delivery) {
++     '#options' => commerce_delivery_get_status(),
++     '#default_value' => $delivery->status,
++     '#required' => TRUE,
+++    '#weight' => -10,
++   );
++   $form['delivery_id'] = array(
++-    '#type' => 'hidden',
+++    '#type' => 'value',
++     '#default_value' => $delivery->delivery_id,
++   );
++   $form['order_id'] = array(
++-    '#type' => 'hidden',
+++    '#type' => 'value',
++     '#default_value' => $delivery->order_id,
++   );
++   $form['type'] = array(
++-    '#type' => 'hidden',
+++    '#type' => 'value',
++     '#value' => $delivery->type,
++   );
+++
+++  $form['items'] = array(
+++      '#type' => 'fieldset',
+++      '#weight' => 10,
+++      '#title' => t('Items quantity'),
+++      '#description' => t('Enter the quantity of items you want to add to this delivery or leave as is to include all the items <br/><br/>'),
+++  );
+++
+++  foreach (commerce_delivery_get_items($delivery->delivery_id) as $item) {
+++    $form['items']['qty_' . $item->line_item_id] = array(
+++      '#type' => 'textfield',
+++      '#title' => $item->label,
+++      '#default_value' => $item->qty,
+++      '#size' => 5,
+++    );
+++  }
+++
++   $form['destination'] = array(
++-    '#type' => 'hidden',
+++    '#type' => 'value',
++     '#value' => drupal_get_destination(),
++   );
++   $form['actions'] = array('#type' => 'actions');
++@@ -493,15 +608,34 @@ function commerce_delivery_edit_form($form, &$form_state, $delivery) {
++   return $form;
++ }
++ 
+++function commerce_delivery_edit_form_validate($form, &$form_state) {
+++  commerce_delivery_validate_qty($form_state['values'], 'admin/commerce/deliveries/' . $form_state['values']['delivery_id'] . '/edit');
+++}
+++
++ function commerce_delivery_edit_form_submit($form, &$form_state) {
++-  $destination = $form_state['values']['destination'];
++-  unset($form_state['values']['destination']);
++   $delivery_submission = (object) $form_state['values'];
++   field_attach_submit('commerce_delivery', $delivery_submission, $form, $form_state);
++   $delivery = commerce_delivery_save($delivery_submission);
++   // should next line go in rules?
++-  drupal_set_message(t('Delivery status updated.'));
++-  $form_state['redirect'] = $destination;
+++  drupal_set_message(t('Delivery information updated.'));
+++  $form_state['redirect'] = 'admin/commerce/orders/' . $form['order_id']['#value'] . '/deliveries';
+++}
+++
+++/**
+++ * Returns an array of items selected by delivery ID.
+++ *
+++ * @param int delivery_id
+++ *   The delivery ID to get items.
+++ *
+++ * @return array
+++ *   Array of items and their fields.
+++ */
+++function commerce_delivery_get_items($delivery_id) {
+++  return db_select('commerce_delivery_items', 'cdi')
+++  ->fields('cdi')
+++  ->condition('delivery_id', $delivery_id, '=')
+++  ->execute()
+++  ->fetchAll();
++ }
++ 
++ /**
++@@ -532,7 +666,7 @@ function commerce_delivery_page_delete_confirm_form_submit($form, &$form_state)
++   $delivery = $form_state['delivery'];
++   commerce_delivery_delete($delivery);
++   drupal_set_message(t('Deleted delivery %label.', array('%label' => $delivery->delivery_id)));
++-  $form_state['redirect'] = 'admin/commerce/deliveries';
+++  $form_state['redirect'] = 'admin/commerce/orders/' . $delivery->order_id . '/deliveries';
++ }
++ 
++ /**
++@@ -549,6 +683,10 @@ function commerce_delivery_delete($delivery) {
++     ->condition('delivery_id', $delivery->delivery_id)
++     ->execute();
++ 
+++  db_delete('commerce_delivery_items')
+++    ->condition('delivery_id', $delivery->delivery_id)
+++    ->execute();
+++
++   entity_get_controller('commerce_delivery')->resetCache();
++ }
++ 
++@@ -673,7 +811,6 @@ function commerce_delivery_ref_default_value($type, $line_item, $f, $i, $lang) {
++   return array(array('value' => 0));
++ }
++ 
++-
++ function commerce_delivery_entity_view($entity, $type, $view_mode, $langcode) {
++   if ($type == 'commerce_order') {
++     $entity->content['commerce_delivery_for_order'] = array(
++diff --git a/includes/commerce_delivery.controller.inc b/includes/commerce_delivery.controller.inc
++index d1244c8..56da372 100644
++--- a/includes/commerce_delivery.controller.inc
+++++ b/includes/commerce_delivery.controller.inc
++@@ -29,7 +29,6 @@ class CommerceDeliveryEntityController extends DrupalDefaultEntityController {
++   }
++ 
++   public function save($delivery) {
++-
++     $op = 'update';
++     // Set the timestamp fields.
++     if (empty($delivery->delivery_id)) {
++@@ -52,7 +51,13 @@ class CommerceDeliveryEntityController extends DrupalDefaultEntityController {
++     return $delivery;
++ //    return parent::save($delivery);
++   }
++-}
++-
++ 
+++  public function saveItem($item) {
+++    db_delete('commerce_delivery_items')
+++    ->condition('delivery_id', $item['delivery_id'])
+++    ->condition('line_item_id', $item['line_item_id'])
+++    ->execute();
++ 
+++    drupal_write_record('commerce_delivery_items', $item);
+++  }
+++}
+diff --git a/commerce_delivery.info b/commerce_delivery.info
+index 072c451..14a66d9 100644
+--- a/commerce_delivery.info
++++ b/commerce_delivery.info
+@@ -7,10 +7,14 @@ core = 7.x
+ files[] = includes/commerce_delivery.controller.inc
+ 
+ ; Views handlers
+-files[] = includes/commerce_delivery_handler_field_delivery_status.inc
+-files[] = includes/commerce_delivery_handler_filter_delivery_status.inc
+-files[] = includes/commerce_delivery_handler_line_item_set_delivery.inc
+-files[] = includes/commerce_delivery_handler_line_item_delivery.inc
++files[] = includes/views/commerce_delivery_handler_field_delivery_operations.inc
++files[] = includes/views/commerce_delivery_handler_field_delivery_items.inc
++files[] = includes/views/commerce_delivery_handler_field_delivery_status.inc
++files[] = includes/views/commerce_delivery_handler_filter_delivery_status.inc
++files[] = includes/views/commerce_delivery_handler_line_item_set_delivery.inc
++files[] = includes/views/commerce_delivery_handler_line_item_delivery.inc
++files[] = includes/views/commerce_delivery.views_default.inc
++files[] = includes/views/commerce_delivery.views.inc
+ 
+ dependencies[] = commerce
+ dependencies[] = commerce_line_item
+@@ -22,4 +26,3 @@ dependencies[] = rules
+ dependencies[] = number
+ 
+ configure = admin/commerce/config/delivery
+-
+diff --git a/commerce_delivery.install b/commerce_delivery.install
+index 918f985..e56b2ae 100644
+--- a/commerce_delivery.install
++++ b/commerce_delivery.install
+@@ -57,6 +57,37 @@ function commerce_delivery_schema() {
+       ),
+     ),
+   );
++  $schema['commerce_delivery_items'] = array(
++    'description' => 'The base table for delivery items.',
++    'fields' => array(
++      'item_id' => array(
++        'type' => 'serial',
++        'not null' => TRUE,
++      ),
++      'delivery_id' => array(
++        'type' => 'int',
++        'not null' => TRUE,
++      ),
++      'order_id' => array(
++        'type' => 'int',
++        'not null' => TRUE,
++      ),
++      'label' => array(
++        'type' => 'varchar',
++        'length' => 255,
++        'not null' => TRUE,
++      ),
++      'line_item_id' => array(
++        'type' => 'int',
++        'not null' => TRUE,
++      ),
++      'qty' => array(
++        'type' => 'int',
++        'not null' => TRUE,
++      ),
++    ),
++    'primary key' => array('item_id'),
++  );
+   return $schema;
+ }
+ 
+@@ -70,9 +101,14 @@ function commerce_delivery_field_schema($field) {
+         'description' => 'Delivery ID.',
+         'type' => 'int',
+       ),
++      'delivery_qty' => array(
++        'description' => 'Delivery quantity.',
++        'type' => 'int',
++      ),
+     ),
+     'indexes' => array(
+       'delivery_ref' => array('delivery_ref'),
++      'delivery_qty' => array('delivery_qty'),
+     ),
+     'foreign keys' => array(
+       'delivery_id' => array(
+@@ -123,6 +159,7 @@ function commerce_delivery_install() {
+  */
+ function commerce_delivery_uninstall() {
+   field_delete_field('delivery_ref');
++  field_delete_field('delivery_qty');
+   variable_del('commerce_delivery_status_options');
+   variable_del('commerce_delivery_default_status');
+   variable_del('commerce_delivery_active_status');
+diff --git a/commerce_delivery.module b/commerce_delivery.module
+index 342145d..c3e5e88 100644
+--- a/commerce_delivery.module
++++ b/commerce_delivery.module
+@@ -103,7 +103,31 @@ function commerce_delivery_new($order_id = 0, $status = 0, $type = 'commerce_del
+  *   The saved delivery object.
+  */
+ function commerce_delivery_save($delivery) {
+-  return entity_get_controller('commerce_delivery')->save($delivery);
++  $controller = entity_get_controller('commerce_delivery');
++
++  $new = empty($delivery->delivery_id);
++
++  $delivery = $controller->save($delivery);
++
++  foreach ($delivery as $key => $value) {
++    if (strpos($key ,'qty_') === 0) {
++      $exp = explode('_', $key);
++
++      $line_item = commerce_line_item_load(end($exp));
++
++      $item = array(
++        'line_item_id' => $line_item->line_item_id,
++        'label' => $line_item->line_item_label,
++        'qty' => $delivery->{$key},
++        'order_id' => $delivery->order_id,
++        'delivery_id' => $delivery->delivery_id,
++      );
++
++      $controller->saveItem($item, $new);
++    }
++  }
++
++  return $delivery;
+ }
+ 
+ /**
+@@ -196,15 +220,6 @@ function commerce_delivery_menu() {
+     'weight' => 0,
+     'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
+   );
+-  $items['admin/commerce/orders/%commerce_order/deliveries/move/%commerce_line_item/%commerce_delivery'] = array(
+-    'title' => 'Move line item to a delivery',
+-    'page callback' => 'commerce_delivery_move_item',
+-    'page arguments' => array(3, 6, 7),
+-    'access callback' => 'commerce_order_access',
+-    'access arguments' => array('update', 3),
+-    'weight' => 10,
+-    'type' => MENU_CALLBACK,
+-  );
+   $items['admin/commerce/deliveries/%commerce_delivery'] = array(
+     'page arguments' => array(3),
+     'access arguments' => array('commerce_delivery_administer_deliveries'),
+@@ -280,49 +295,36 @@ function commerce_delivery_field_extra_fields() {
+  * Page callback.
+  */
+ function commerce_delivery_by_order_view($order) {
+-  $destination = drupal_get_destination();
+-  $views->content = '<ul class="action-links"><li>';
+-  $views->content .= l(t('Add delivery'), 'admin/commerce/deliveries/add/' . $order->order_id,
+-                        array('query' => $destination));
++  $query = new EntityFieldQuery();
+ 
+-  $views->content .= '</li></ul>';
+-  $views->content .= views_embed_view('commerce_delivery_by_order', 'default', $order->order_id);
+-  return $views->content;
+-}
++  $header = array(t('Delivery ID'), t('Items'), t('Status'), t('Date created'), t('Date updated'), t('Actions'));
+ 
+-/**
+- * Page callback for moving a line item to a delivery.
+- *
+- * @param $order
+- *  The order entity.
+- * @param $line_item
+- *  The line item entity.
+- * @param $delivery
+- *  The delivery entity.
+- */
+-function commerce_delivery_move_item($order, $line_item, $delivery) {
+-  // Validate the token from the link.
+-  $token = $_REQUEST['token'];
+-  if ($token != commerce_delivery_get_token($order->order_id, $line_item->line_item_id, $delivery->delivery_id)) {
+-    drupal_set_message(t('Invalid token.'), 'error');
+-    return drupal_access_denied();
+-  }
++  $rows = array();
++
++  $status = commerce_delivery_get_status();
++
++  $results = $query->entityCondition('entity_type', 'commerce_delivery')
++  ->propertyCondition('order_id', $order->order_id)
++  ->execute();
+ 
+-  // Validate that the line item belongs to the order.
+-  if ($line_item->order_id != $order->order_id) {
+-    drupal_set_message(t('Invalid parameters.'), 'error');
+-    return drupal_access_denied();
++  if ($results) {
++    $output['table'] = array(
++      '#type' => 'markup',
++      '#markup' => views_embed_view('order_deliveries', 'block', $order->order_id),
++    );
++  }
++  else {
++    drupal_set_message(t('No deliveries created yet'), 'warning');
+   }
+ 
+-  $wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
+-  // setting the deliver ref
+-  $wrapper->delivery_ref = $delivery->delivery_id;
+-  commerce_line_item_save($line_item);
+-  drupal_set_message(t('Item %item has been moved to delivery %delivery.', array(
+-    '%item' => $line_item->line_item_label,
+-    '%delivery' => $delivery->delivery_id,
+-  )));
+-  drupal_goto();
++  $output['actions'] = array(
++    '#attributes' => array('class' => array('action-links')),
++    '#items' => array(l(t('Add delivery'), 'admin/commerce/deliveries/add/' . $order->order_id)),
++    '#theme' => 'item_list',
++    '#weight' => -10,
++  );
++
++  return $output;
+ }
+ 
+ /**
+@@ -411,13 +413,35 @@ function commerce_delivery_add_form($form, &$form_state, $delivery) {
+     '#required' => TRUE,
+   );
+   $form['order_id'] = array(
+-    '#type' => 'hidden',
++    '#type' => 'value',
+     '#default_value' => $delivery->order_id,
+   );
+   $form['type'] = array(
+-    '#type' => 'hidden',
++    '#type' => 'value',
+     '#value' => 'commerce_delivery',
+   );
++
++  $form['items'] = array(
++  	'#type' => 'fieldset',
++    '#title' => t('Items quantity'),
++    '#description' => t('Enter the quantity of items you want to add to this delivery or leave as is to include all the items <br/><br/>'),
++  );
++
++  $order = commerce_order_load($delivery->order_id);
++
++  foreach ($order->commerce_line_items[LANGUAGE_NONE] as $line) {
++    $line_item = commerce_line_item_load($line['line_item_id']);
++
++    if ($line_item->type == 'product') {
++      $form['items']['qty_' . $line['line_item_id']] = array(
++        '#type' => 'textfield',
++        '#title' => $line_item->line_item_label,
++        '#default_value' => round($line_item->quantity - commerce_delivery_get_total_assigned($line['line_item_id'], $delivery->order_id, false)),
++        '#size' => 5,
++      );
++    }
++  }
++
+   $form['submit'] = array(
+     '#type' => 'submit',
+     '#value' => t('Save'),
+@@ -427,6 +451,7 @@ function commerce_delivery_add_form($form, &$form_state, $delivery) {
+ }
+ 
+ function commerce_delivery_add_form_validate($form, &$form_state) {
++  commerce_delivery_validate_qty($form_state['values'], 'admin/commerce/deliveries/add/' . $form_state['values']['order_id']);
+   $delivery_submission = (object) $form_state['values'];
+   field_attach_form_validate('commerce_delivery', $delivery_submission, $form, $form_state);
+ }
+@@ -437,7 +462,65 @@ function commerce_delivery_add_form_submit($form, &$form_state) {
+   $delivery = commerce_delivery_save($delivery_submission);
+   // should next line go in rules?
+   drupal_set_message(t('A new delivery has been added.'));
+-  $form_state['redirect'] = "admin/commerce/deliveries";
++  drupal_goto('admin/commerce/orders/' . $form['order_id']['#value'] . '/deliveries');
++}
++
++/**
++ * Validation on the quantity fields. The quantity could not be more than total items in the order minus the amount of recently shipped items.
++ *
++ * @param array $data
++ *   The values coming from the submitted form.
++ * @param string $redirect
++ *   The path for return if the validation is unsuccessful.
++ * @param bool $errors
++ *   Preset condition. Should I put this var inside the function or leave as a param?
++ */
++function commerce_delivery_validate_qty($data, $redirect, $errors = false) {
++  $order = commerce_order_load($data['order_id']);
++
++  foreach ($order->commerce_line_items[LANGUAGE_NONE] as $line) {
++    $line_item = commerce_line_item_load($line['line_item_id']);
++
++    if (!isset($data['delivery_id'])) {
++      $data['delivery_id'] = false;
++    }
++
++    $max = $line_item->quantity - commerce_delivery_get_total_assigned($line['line_item_id'], $data['order_id'], $data['delivery_id']);
++
++    if ($data['qty_' . $line['line_item_id']] > $max) {
++      $errors = (bool)drupal_set_message(t('The maximum quantity for %l is %q', array('%q' => $max, '%l' => $line_item->line_item_label)), 'error');
++    }
++
++    if ($data['qty_' . $line['line_item_id']] < 0) {
++      $errors = (bool)drupal_set_message(t('Enter a valid quantity'), 'error');
++    }
++  }
++
++  if ($errors) {
++    drupal_goto($redirect);
++  }
++}
++
++/**
++ * Gets the number of items assigned to a delivery.
++ *
++ * @param int $line_item_id
++ * @param int $order_id
++ * @param mixed $delivery_id
++ */
++function commerce_delivery_get_total_assigned($line_item_id, $order_id, $delivery_id) {
++  $query = db_select('commerce_delivery_items', 'cdi')
++  ->fields('cdi', array('qty'))
++  ->condition('order_id', $order_id, '=')
++  ->condition('line_item_id', $line_item_id, '=');
++
++  if ($delivery_id) {
++    $query->condition('delivery_id', $delivery_id, '!=');
++  }
++
++  $query->addExpression('SUM(qty)', 'total');
++
++  return $query->execute()->fetch()->total;
+ }
+ 
+ /**
+@@ -456,23 +539,37 @@ function commerce_delivery_edit_form($form, &$form_state, $delivery) {
+     '#options' => commerce_delivery_get_status(),
+     '#default_value' => $delivery->status,
+     '#required' => TRUE,
++    '#weight' => -10,
+   );
+   $form['delivery_id'] = array(
+-    '#type' => 'hidden',
++    '#type' => 'value',
+     '#default_value' => $delivery->delivery_id,
+   );
+   $form['order_id'] = array(
+-    '#type' => 'hidden',
++    '#type' => 'value',
+     '#default_value' => $delivery->order_id,
+   );
+   $form['type'] = array(
+-    '#type' => 'hidden',
++    '#type' => 'value',
+     '#value' => $delivery->type,
+   );
+-  $form['destination'] = array(
+-    '#type' => 'hidden',
+-    '#value' => drupal_get_destination(),
++
++  $form['items'] = array(
++      '#type' => 'fieldset',
++      '#weight' => 10,
++      '#title' => t('Items quantity'),
++      '#description' => t('Enter the quantity of items you want to add to this delivery or leave as is to include all the items <br/><br/>'),
+   );
++
++  foreach (commerce_delivery_get_items($delivery->delivery_id) as $item) {
++    $form['items']['qty_' . $item->line_item_id] = array(
++      '#type' => 'textfield',
++      '#title' => $item->label,
++      '#default_value' => $item->qty,
++      '#size' => 5,
++    );
++  }
++
+   $form['actions'] = array('#type' => 'actions');
+   $form['actions']['submit'] = array(
+     '#type' => 'submit',
+@@ -493,15 +590,34 @@ function commerce_delivery_edit_form($form, &$form_state, $delivery) {
+   return $form;
+ }
+ 
++function commerce_delivery_edit_form_validate($form, &$form_state) {
++  commerce_delivery_validate_qty($form_state['values'], 'admin/commerce/deliveries/' . $form_state['values']['delivery_id'] . '/edit');
++}
++
+ function commerce_delivery_edit_form_submit($form, &$form_state) {
+-  $destination = $form_state['values']['destination'];
+-  unset($form_state['values']['destination']);
+   $delivery_submission = (object) $form_state['values'];
+   field_attach_submit('commerce_delivery', $delivery_submission, $form, $form_state);
+   $delivery = commerce_delivery_save($delivery_submission);
+   // should next line go in rules?
+-  drupal_set_message(t('Delivery status updated.'));
+-  $form_state['redirect'] = $destination;
++  drupal_set_message(t('Delivery information updated.'));
++  $form_state['redirect'] = 'admin/commerce/orders/' . $form['order_id']['#value'] . '/deliveries';
++}
++
++/**
++ * Returns an array of items selected by delivery ID.
++ *
++ * @param int delivery_id
++ *   The delivery ID to get items.
++ *
++ * @return array
++ *   Array of items and their fields.
++ */
++function commerce_delivery_get_items($delivery_id) {
++  return db_select('commerce_delivery_items', 'cdi')
++  ->fields('cdi')
++  ->condition('delivery_id', $delivery_id, '=')
++  ->execute()
++  ->fetchAll();
+ }
+ 
+ /**
+@@ -532,7 +648,60 @@ function commerce_delivery_page_delete_confirm_form_submit($form, &$form_state)
+   $delivery = $form_state['delivery'];
+   commerce_delivery_delete($delivery);
+   drupal_set_message(t('Deleted delivery %label.', array('%label' => $delivery->delivery_id)));
+-  $form_state['redirect'] = 'admin/commerce/deliveries';
++  $form_state['redirect'] = 'admin/commerce/orders/' . $delivery->order_id . '/deliveries';
++}
++
++/**
++ * Implements hook_action_info().
++ */
++function commerce_delivery_action_info() {
++  $actions['commerce_delivery_action_delete'] = array(
++    'label' => t('Delete deliveries'),
++    'type' => 'commerce_delivery',
++    'configurable' => FALSE,
++    'triggers' => array('any'),
++  );
++
++  $actions['commerce_delivery_action_edit_status'] = array(
++    'label' => t('Change status'),
++    'type' => 'commerce_delivery',
++    'configurable' => TRUE,
++    'triggers' => array('any'),
++  );
++
++  return $actions;
++}
++
++function commerce_delivery_action_delete($delivery, $context) {
++  commerce_delivery_delete($delivery);
++}
++
++function commerce_delivery_action_edit_status_form($delivery, $context) {
++  $options = array();
++
++  foreach (commerce_delivery_get_status() as $status_id => $status) {
++    $options[$status_id] = $status;
++  }
++
++  $form['status'] = array(
++    '#type' => 'select',
++    '#title' => t('Select the status'),
++    '#options' => $options,
++  );
++
++  return $form;
++}
++
++function commerce_delivery_action_edit_status_submit($form, $context) {
++  $controller = entity_get_controller('commerce_delivery');
++
++  foreach ($context['selection'] as $delivery_id) {
++    $delivery = commerce_delivery_load($delivery_id);
++    $delivery->status = $context['input']['status'];
++    $controller->save($delivery);
++  }
++
++  return (array)$delivery;
+ }
+ 
+ /**
+@@ -549,6 +718,10 @@ function commerce_delivery_delete($delivery) {
+     ->condition('delivery_id', $delivery->delivery_id)
+     ->execute();
+ 
++  db_delete('commerce_delivery_items')
++    ->condition('delivery_id', $delivery->delivery_id)
++    ->execute();
++
+   entity_get_controller('commerce_delivery')->resetCache();
+ }
+ 
+@@ -622,7 +795,7 @@ function commerce_delivery_settings_form($form, &$form_state) {
+ function commerce_delivery_views_api() {
+   return array(
+     'api' => 3,
+-    'path' => drupal_get_path('module', 'commerce_delivery') . '/includes',
++    'path' => drupal_get_path('module', 'commerce_delivery') . '/includes/views',
+   );
+ }
+ 
+@@ -673,7 +846,6 @@ function commerce_delivery_ref_default_value($type, $line_item, $f, $i, $lang) {
+   return array(array('value' => 0));
+ }
+ 
+-
+ function commerce_delivery_entity_view($entity, $type, $view_mode, $langcode) {
+   if ($type == 'commerce_order') {
+     $entity->content['commerce_delivery_for_order'] = array(
+diff --git a/commerce_delivery.rules.inc b/commerce_delivery.rules.inc
+index fec102a..f241267 100644
+--- a/commerce_delivery.rules.inc
++++ b/commerce_delivery.rules.inc
+@@ -228,11 +228,31 @@ function commerce_delivery_rules_action_info() {
+     ),
+     'group' => t('Commerce Line Item'),
+   );
++  /*$actions['commerce_delivery_action_delete'] = array(
++      'label' => t('Delete a delivery'),
++      'parameter' => array(
++        'delivery' => array(
++          'type' => 'commerce_delivery',
++          'label' => t('Commerce Delivery'),
++        ),
++      ),
++      'group' => t('Commerce Delivery'),
++  );*/
+   return $actions;
+ }
+ 
+ /**
+  * Rules action callback:
++ * delete a delivery.
++ */
++/*
++function commerce_delivery_action_delete($delivery) {
++  commerce_delivery_delete($delivery);
++}
++*/
++
++/**
++ * Rules action callback:
+  * assign line items to order default delivery.
+  */
+ function commerce_delivery_assign_delivery($line_item) {
+@@ -255,7 +275,7 @@ function commerce_delivery_assign_orphans($delivery) {
+   // getting shippable items from this order
+   $order = commerce_order_load($delivery->order_id);
+   $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+-  $items = $order_wrapper->commerce_line_items->value(); 
++  $items = $order_wrapper->commerce_line_items->value();
+   foreach ($items as $line_item) {
+     $wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
+     // checking if it's orphan
+diff --git a/includes/commerce_delivery.controller.inc b/includes/commerce_delivery.controller.inc
+index d1244c8..56da372 100644
+--- a/includes/commerce_delivery.controller.inc
++++ b/includes/commerce_delivery.controller.inc
+@@ -29,7 +29,6 @@ class CommerceDeliveryEntityController extends DrupalDefaultEntityController {
+   }
+ 
+   public function save($delivery) {
+-
+     $op = 'update';
+     // Set the timestamp fields.
+     if (empty($delivery->delivery_id)) {
+@@ -52,7 +51,13 @@ class CommerceDeliveryEntityController extends DrupalDefaultEntityController {
+     return $delivery;
+ //    return parent::save($delivery);
+   }
+-}
+-
+ 
++  public function saveItem($item) {
++    db_delete('commerce_delivery_items')
++    ->condition('delivery_id', $item['delivery_id'])
++    ->condition('line_item_id', $item['line_item_id'])
++    ->execute();
+ 
++    drupal_write_record('commerce_delivery_items', $item);
++  }
++}
+diff --git a/includes/commerce_delivery.views.inc b/includes/commerce_delivery.views.inc
+deleted file mode 100644
+index 249c78a..0000000
+--- a/includes/commerce_delivery.views.inc
++++ /dev/null
+@@ -1,160 +0,0 @@
+-<?php
+-
+-/**
+- * @file
+- * Export Drupal Commerce deliveries to Views.
+- */
+-
+-/**
+- * Implements hook_views_data().
+- */
+-function commerce_delivery_views_data() {
+-  $data = array();
+-
+-  $data['commerce_delivery']['table']['group']  = t('Commerce Delivery');
+-
+-  $data['commerce_delivery']['table']['base'] = array(
+-    'field' => 'delivery_id',
+-    'title' => t('Commerce Delivery'),
+-    'help' => t('Delivery.'),
+-  );
+-
+-  // Expose the order ID.
+-  $data['commerce_delivery']['order_id'] = array(
+-    'title' => t('Order ID'),
+-    'help' => t('The unique internal identifier of the order.'),
+-    'field' => array(
+-      'handler' => 'views_handler_field',
+-      'click sortable' => TRUE,
+-    ),
+-    'filter' => array(
+-      'handler' => 'views_handler_filter_numeric',
+-    ),
+-    'sort' => array(
+-      'handler' => 'views_handler_sort',
+-    ),
+-    'argument' => array(
+-      'handler' => 'views_handler_argument_numeric',
+-      'name field' => 'order_number',
+-      'numeric' => TRUE,
+-      'validate type' => 'order_id',
+-    ),
+-    'relationship' => array(
+-       'base' => 'commerce_order',
+-       'field' => 'order_id',
+-       'handler' => 'views_handler_relationship',
+-       'label' => t('Order ID'),
+-    ),
+-  );
+-
+-  // Expose the delivery id.
+-  $data['commerce_delivery']['delivery_id'] = array(
+-    'title' => t('Delivery id'),
+-    'help' => t('The delive id.'),
+-    'field' => array(
+-      'handler' => 'views_handler_field',
+-      'click sortable' => TRUE,
+-    ),
+-    'filter' => array(
+-      'handler' => 'views_handler_filter_numeric',
+-    ),
+-    'sort' => array(
+-      'handler' => 'views_handler_sort',
+-    ),
+-    'argument' => array(
+-      'handler' => 'views_handler_argument_numeric',
+-    ),
+-  );
+-
+-  // Expose the delivery status.
+-  $data['commerce_delivery']['status'] = array(
+-    'title' => t('Delivery status'),
+-    'help' => t('The workflow status of the delivery.'),
+-    'field' => array(
+-      'handler' => 'commerce_delivery_handler_field_delivery_status',
+-      'click sortable' => TRUE,
+-    ),
+-    'filter' => array(
+-      'handler' => 'commerce_delivery_handler_filter_delivery_status',
+-    ),
+-    'sort' => array(
+-      'handler' => 'views_handler_sort',
+-    ),
+-    'argument' => array(
+-      'handler' => 'views_handler_argument_numeric',
+-    ),
+-  );
+-
+-  // Expose the created and changed timestamps.
+-  $data['commerce_delivery']['created'] = array(
+-    'title' => t('Created date'),
+-    'help' => t('The date the delivery was created.'),
+-    'field' => array(
+-      'handler' => 'views_handler_field_date',
+-      'click sortable' => TRUE,
+-    ),
+-    'sort' => array(
+-      'handler' => 'views_handler_sort_date',
+-    ),
+-    'filter' => array(
+-      'handler' => 'views_handler_filter_date',
+-    ),
+-  );
+-
+-  $data['commerce_delivery']['changed'] = array(
+-    'title' => t('Updated date'),
+-    'help' => t('The date the order was last updated.'),
+-    'field' => array(
+-      'handler' => 'views_handler_field_date',
+-      'click sortable' => TRUE,
+-    ),
+-    'sort' => array(
+-      'handler' => 'views_handler_sort_date',
+-    ),
+-    'filter' => array(
+-      'handler' => 'views_handler_filter_date',
+-    ),
+-  );
+-
+-  // Expose links to operate on the line item delivery.
+-  $data['commerce_line_item']['set_delivery'] = array(
+-    'field' => array(
+-      'title' => t('Move item to delivery'),
+-      'help' => t('Provide links to move each line items to a different delivery.'),
+-      'handler' => 'commerce_delivery_handler_line_item_set_delivery',
+-    ),
+-  );
+-  
+-  /* Relate a line item to the delivery */
+-  //$data['field_data_delivery_ref']['table']['group'] = t('Commerce Line Item');
+-  $data['commerce_line_item']['delivery_ref'] = array(
+-    'title' => t('Delivery ID'),
+-    'help' => t('The uniquement internal identifier of the associated delivery.'),
+-    'field' => array(
+-      'handler' => 'commerce_delivery_handler_field_line_item_delivery',
+-      'click sortable' => TRUE,
+-    ),
+-    'filter' => array(
+-      'handler' => 'views_handler_filter_numeric',
+-    ),
+-    'sort' => array(
+-      'handler' => 'views_handler_sort',
+-    ),
+-    'argument' => array(
+-      'handler' => 'views_handler_argument_numeric',
+-      'numeric' => TRUE,
+-    ),
+-    'relationship' => array(
+-      'handler' => 'views_handler_relationship',
+-      'base' => 'commerce_delivery',
+-      'field' => 'delivery_id',
+-      'relationship table' => 'field_data_delivery_ref',
+-      'relationship field' => 'delivery_ref_value',
+-      'label' => t('Delivery', array(), array('context' => 'a drupal commerce delivery')),
+-    )
+-  );
+-
+-  return $data;
+-
+-}
+-
+diff --git a/includes/commerce_delivery.views_default.inc b/includes/commerce_delivery.views_default.inc
+deleted file mode 100644
+index 1ae4052..0000000
+--- a/includes/commerce_delivery.views_default.inc
++++ /dev/null
+@@ -1,848 +0,0 @@
+-<?php
+-
+-/**
+- * @file
+- * Implements hook_views_default_views().
+- */
+-function commerce_delivery_views_default_views() {
+-
+-  $field_id = variable_get('commerce_delivery_shippable_field', '');
+-  $field_info = field_info_field_by_id($field_id);
+-  $field_shippable = $field_info['field_name'];
+-
+-  $views = array();
+-
+-  $view = new view;
+-  $view->name = 'commerce_delivery';
+-  $view->description = 'Display a list of deliveries for the store admin.';
+-  $view->tag = 'commerce';
+-  $view->base_table = 'commerce_delivery';
+-  $view->human_name = 'Commerce delivery list';
+-  $view->core = 7;
+-  $view->api_version = '3.0-alpha1';
+-  $view->disabled = FALSE; /* Edit this to true to make a default view disabled initially */
+-
+-  /* Display: Defaults */
+-  $handler = $view->new_display('default', 'Defaults', 'default');
+-  $handler->display->display_options['title'] = 'Deliveries';
+-  $handler->display->display_options['access']['type'] = 'perm';
+-  $handler->display->display_options['access']['perm'] = 'commerce_delivery_manage_deliveries';
+-  $handler->display->display_options['cache']['type'] = 'none';
+-  $handler->display->display_options['query']['type'] = 'views_query';
+-  $handler->display->display_options['query']['options']['query_comment'] = FALSE;
+-  $handler->display->display_options['exposed_form']['type'] = 'basic';
+-  $handler->display->display_options['pager']['type'] = 'full';
+-  $handler->display->display_options['style_plugin'] = 'table';
+-  $handler->display->display_options['style_options']['columns'] = array(
+-    'delivery_id' => 'delivery_id',
+-    'order_id' => 'order_id',
+-    'status' => 'status',
+-    'delivery_id_1' => 'delivery_id_1',
+-    'delivery_id_2' => 'delivery_id_1',
+-  );
+-  $handler->display->display_options['style_options']['default'] = '-1';
+-  $handler->display->display_options['style_options']['info'] = array(
+-    'delivery_id' => array(
+-      'sortable' => 0,
+-      'default_sort_order' => 'asc',
+-      'align' => '',
+-      'separator' => '',
+-    ),
+-    'order_id' => array(
+-      'sortable' => 0,
+-      'default_sort_order' => 'asc',
+-      'align' => '',
+-      'separator' => '',
+-    ),
+-    'status' => array(
+-      'sortable' => 0,
+-      'default_sort_order' => 'asc',
+-      'align' => '',
+-      'separator' => '',
+-    ),
+-    'delivery_id_1' => array(
+-      'sortable' => 0,
+-      'default_sort_order' => 'asc',
+-      'align' => '',
+-      'separator' => '&nbsp;&nbsp;&nbsp;',
+-    ),
+-    'delivery_id_2' => array(
+-      'sortable' => 0,
+-      'default_sort_order' => 'asc',
+-      'align' => '',
+-      'separator' => '',
+-    ),
+-  );
+-  $handler->display->display_options['style_options']['override'] = 1;
+-  $handler->display->display_options['style_options']['sticky'] = 0;
+-  $handler->display->display_options['style_options']['empty_table'] = 0;
+-  /* Field: Commerce Delivery: Delivery id */
+-  $handler->display->display_options['fields']['delivery_id']['id'] = 'delivery_id';
+-  $handler->display->display_options['fields']['delivery_id']['table'] = 'commerce_delivery';
+-  $handler->display->display_options['fields']['delivery_id']['field'] = 'delivery_id';
+-  $handler->display->display_options['fields']['delivery_id']['alter']['alter_text'] = 0;
+-  $handler->display->display_options['fields']['delivery_id']['alter']['make_link'] = 1;
+-  $handler->display->display_options['fields']['delivery_id']['alter']['path'] = 'admin/commerce/deliveries/[delivery_id]/view';
+-  $handler->display->display_options['fields']['delivery_id']['alter']['absolute'] = 1;
+-  $handler->display->display_options['fields']['delivery_id']['alter']['external'] = 0;
+-  $handler->display->display_options['fields']['delivery_id']['alter']['nl2br'] = 0;
+-  $handler->display->display_options['fields']['delivery_id']['alter']['word_boundary'] = 1;
+-  $handler->display->display_options['fields']['delivery_id']['alter']['ellipsis'] = 1;
+-  $handler->display->display_options['fields']['delivery_id']['alter']['strip_tags'] = 0;
+-  $handler->display->display_options['fields']['delivery_id']['alter']['trim'] = 0;
+-  $handler->display->display_options['fields']['delivery_id']['alter']['html'] = 0;
+-  $handler->display->display_options['fields']['delivery_id']['element_label_colon'] = 1;
+-  $handler->display->display_options['fields']['delivery_id']['element_default_classes'] = 1;
+-  $handler->display->display_options['fields']['delivery_id']['hide_empty'] = 0;
+-  $handler->display->display_options['fields']['delivery_id']['empty_zero'] = 0;
+-  /* Field: Commerce Delivery: Order ID */
+-  $handler->display->display_options['fields']['order_id']['id'] = 'order_id';
+-  $handler->display->display_options['fields']['order_id']['table'] = 'commerce_delivery';
+-  $handler->display->display_options['fields']['order_id']['field'] = 'order_id';
+-  $handler->display->display_options['fields']['order_id']['alter']['alter_text'] = 0;
+-  $handler->display->display_options['fields']['order_id']['alter']['make_link'] = 1;
+-  $handler->display->display_options['fields']['order_id']['alter']['path'] = 'admin/commerce/orders/[order_id]/deliveries';
+-  $handler->display->display_options['fields']['order_id']['alter']['absolute'] = 0;
+-  $handler->display->display_options['fields']['order_id']['alter']['external'] = 0;
+-  $handler->display->display_options['fields']['order_id']['alter']['nl2br'] = 0;
+-  $handler->display->display_options['fields']['order_id']['alter']['word_boundary'] = 1;
+-  $handler->display->display_options['fields']['order_id']['alter']['ellipsis'] = 1;
+-  $handler->display->display_options['fields']['order_id']['alter']['strip_tags'] = 0;
+-  $handler->display->display_options['fields']['order_id']['alter']['trim'] = 0;
+-  $handler->display->display_options['fields']['order_id']['alter']['html'] = 0;
+-  $handler->display->display_options['fields']['order_id']['element_label_colon'] = 1;
+-  $handler->display->display_options['fields']['order_id']['element_default_classes'] = 1;
+-  $handler->display->display_options['fields']['order_id']['hide_empty'] = 0;
+-  $handler->display->display_options['fields']['order_id']['empty_zero'] = 0;
+-  /* Field: Commerce Delivery: Delivery status */
+-  $handler->display->display_options['fields']['status']['id'] = 'status';
+-  $handler->display->display_options['fields']['status']['table'] = 'commerce_delivery';
+-  $handler->display->display_options['fields']['status']['field'] = 'status';
+-  $handler->display->display_options['fields']['status']['alter']['alter_text'] = 0;
+-  $handler->display->display_options['fields']['status']['alter']['make_link'] = 0;
+-  $handler->display->display_options['fields']['status']['alter']['absolute'] = 0;
+-  $handler->display->display_options['fields']['status']['alter']['external'] = 0;
+-  $handler->display->display_options['fields']['status']['alter']['nl2br'] = 0;
+-  $handler->display->display_options['fields']['status']['alter']['word_boundary'] = 1;
+-  $handler->display->display_options['fields']['status']['alter']['ellipsis'] = 1;
+-  $handler->display->display_options['fields']['status']['alter']['strip_tags'] = 0;
+-  $handler->display->display_options['fields']['status']['alter']['trim'] = 0;
+-  $handler->display->display_options['fields']['status']['alter']['html'] = 0;
+-  $handler->display->display_options['fields']['status']['element_label_colon'] = 1;
+-  $handler->display->display_options['fields']['status']['element_default_classes'] = 1;
+-  $handler->display->display_options['fields']['status']['hide_empty'] = 0;
+-  $handler->display->display_options['fields']['status']['empty_zero'] = 0;
+-  /* Field: Commerce Delivery: Delivery id */
+-  $handler->display->display_options['fields']['delivery_id_1']['id'] = 'delivery_id_1';
+-  $handler->display->display_options['fields']['delivery_id_1']['table'] = 'commerce_delivery';
+-  $handler->display->display_options['fields']['delivery_id_1']['field'] = 'delivery_id';
+-  $handler->display->display_options['fields']['delivery_id_1']['label'] = 'Operations';
+-  $handler->display->display_options['fields']['delivery_id_1']['alter']['alter_text'] = 1;
+-  $handler->display->display_options['fields']['delivery_id_1']['alter']['text'] = 'view';
+-  $handler->display->display_options['fields']['delivery_id_1']['alter']['make_link'] = 1;
+-  $handler->display->display_options['fields']['delivery_id_1']['alter']['path'] = 'admin/commerce/deliveries/[delivery_id]/view';
+-  $handler->display->display_options['fields']['delivery_id_1']['alter']['absolute'] = 0;
+-  $handler->display->display_options['fields']['delivery_id_1']['alter']['external'] = 0;
+-  $handler->display->display_options['fields']['delivery_id_1']['alter']['replace_spaces'] = 0;
+-  $handler->display->display_options['fields']['delivery_id_1']['alter']['trim_whitespace'] = 0;
+-  $handler->display->display_options['fields']['delivery_id_1']['alter']['nl2br'] = 0;
+-  $handler->display->display_options['fields']['delivery_id_1']['alter']['word_boundary'] = 1;
+-  $handler->display->display_options['fields']['delivery_id_1']['alter']['ellipsis'] = 1;
+-  $handler->display->display_options['fields']['delivery_id_1']['alter']['strip_tags'] = 0;
+-  $handler->display->display_options['fields']['delivery_id_1']['alter']['trim'] = 0;
+-  $handler->display->display_options['fields']['delivery_id_1']['alter']['html'] = 0;
+-  $handler->display->display_options['fields']['delivery_id_1']['element_label_colon'] = 1;
+-  $handler->display->display_options['fields']['delivery_id_1']['element_default_classes'] = 1;
+-  $handler->display->display_options['fields']['delivery_id_1']['hide_empty'] = 0;
+-  $handler->display->display_options['fields']['delivery_id_1']['empty_zero'] = 0;
+-  $handler->display->display_options['fields']['delivery_id_1']['hide_alter_empty'] = 0;
+-  /* Field: Commerce Delivery: Delivery id */
+-  $handler->display->display_options['fields']['delivery_id_2']['id'] = 'delivery_id_2';
+-  $handler->display->display_options['fields']['delivery_id_2']['table'] = 'commerce_delivery';
+-  $handler->display->display_options['fields']['delivery_id_2']['field'] = 'delivery_id';
+-  $handler->display->display_options['fields']['delivery_id_2']['label'] = '';
+-  $handler->display->display_options['fields']['delivery_id_2']['alter']['alter_text'] = 1;
+-  $handler->display->display_options['fields']['delivery_id_2']['alter']['text'] = 'edit';
+-  $handler->display->display_options['fields']['delivery_id_2']['alter']['make_link'] = 1;
+-  $handler->display->display_options['fields']['delivery_id_2']['alter']['path'] = 'admin/commerce/deliveries/[delivery_id]/edit';
+-  $handler->display->display_options['fields']['delivery_id_2']['alter']['absolute'] = 0;
+-  $handler->display->display_options['fields']['delivery_id_2']['alter']['external'] = 0;
+-  $handler->display->display_options['fields']['delivery_id_2']['alter']['replace_spaces'] = 0;
+-  $handler->display->display_options['fields']['delivery_id_2']['alter']['trim_whitespace'] = 0;
+-  $handler->display->display_options['fields']['delivery_id_2']['alter']['nl2br'] = 0;
+-  $handler->display->display_options['fields']['delivery_id_2']['alter']['word_boundary'] = 1;
+-  $handler->display->display_options['fields']['delivery_id_2']['alter']['ellipsis'] = 1;
+-  $handler->display->display_options['fields']['delivery_id_2']['alter']['strip_tags'] = 0;
+-  $handler->display->display_options['fields']['delivery_id_2']['alter']['trim'] = 0;
+-  $handler->display->display_options['fields']['delivery_id_2']['alter']['html'] = 0;
+-  $handler->display->display_options['fields']['delivery_id_2']['element_label_colon'] = FALSE;
+-  $handler->display->display_options['fields']['delivery_id_2']['element_default_classes'] = 1;
+-  $handler->display->display_options['fields']['delivery_id_2']['hide_empty'] = 0;
+-  $handler->display->display_options['fields']['delivery_id_2']['empty_zero'] = 0;
+-  $handler->display->display_options['fields']['delivery_id_2']['hide_alter_empty'] = 0;
+-  /* Sort criterion: Commerce Delivery: Delivery id */
+-  $handler->display->display_options['sorts']['delivery_id']['id'] = 'delivery_id';
+-  $handler->display->display_options['sorts']['delivery_id']['table'] = 'commerce_delivery';
+-  $handler->display->display_options['sorts']['delivery_id']['field'] = 'delivery_id';
+-  /* Filter criterion: Commerce Delivery: Delivery status */
+-  $handler->display->display_options['filters']['status']['id'] = 'status';
+-  $handler->display->display_options['filters']['status']['table'] = 'commerce_delivery';
+-  $handler->display->display_options['filters']['status']['field'] = 'status';
+-  $handler->display->display_options['filters']['status']['exposed'] = TRUE;
+-  $handler->display->display_options['filters']['status']['expose']['operator_id'] = 'status_op';
+-  $handler->display->display_options['filters']['status']['expose']['label'] = 'Delivery status';
+-  $handler->display->display_options['filters']['status']['expose']['use_operator'] = 1;
+-  $handler->display->display_options['filters']['status']['expose']['operator'] = 'status_op';
+-  $handler->display->display_options['filters']['status']['expose']['identifier'] = 'status';
+-  $handler->display->display_options['filters']['status']['expose']['multiple'] = 1;
+-  $handler->display->display_options['filters']['status']['expose']['reduce'] = 0;
+-
+-  /* Display: Page */
+-  $handler = $view->new_display('page', 'Page', 'page_1');
+-  $handler->display->display_options['path'] = 'admin/commerce/deliveries/list';
+-  $handler->display->display_options['menu']['type'] = 'default tab';
+-  $handler->display->display_options['menu']['title'] = 'List';
+-  $handler->display->display_options['menu']['weight'] = '0';
+-  $handler->display->display_options['menu']['name'] = 'management';
+-  $handler->display->display_options['tab_options']['type'] = 'normal';
+-  $handler->display->display_options['tab_options']['title'] = 'Deliveries';
+-  $handler->display->display_options['tab_options']['description'] = 'Manage deliveries in the store.';
+-  $handler->display->display_options['tab_options']['weight'] = '0';
+-  $handler->display->display_options['tab_options']['name'] = 'management';
+-
+-  $views[$view->name] = $view;
+-
+-  $view = new view;
+-  $view->name = 'commerce_delivery_view';
+-  $view->description = '';
+-  $view->tag = 'commerce';
+-  $view->base_table = 'commerce_line_item';
+-  $view->human_name = 'Commerce delivery view';
+-  $view->core = 7;
+-  $view->api_version = '3.0-alpha1';
+-  $view->disabled = FALSE; /* Edit this to true to make a default view disabled initially */
+-
+-  /* Display: Master */
+-  $handler = $view->new_display('default', 'Master', 'default');
+-  $handler->display->display_options['title'] = 'Commerce delivery view';
+-  $handler->display->display_options['access']['type'] = 'perm';
+-  $handler->display->display_options['access']['perm'] = 'access orders';
+-  $handler->display->display_options['cache']['type'] = 'none';
+-  $handler->display->display_options['query']['type'] = 'views_query';
+-  $handler->display->display_options['exposed_form']['type'] = 'basic';
+-  $handler->display->display_options['exposed_form']['options']['autosubmit'] = 0;
+-  $handler->display->display_options['exposed_form']['options']['autosubmit_hide'] = 1;
+-  $handler->display->display_options['pager']['type'] = 'full';
+-  $handler->display->display_options['pager']['options']['items_per_page'] = '25';
+-  $handler->display->display_options['style_plugin'] = 'table';
+-  $handler->display->display_options['style_options']['grouping'] = 'commerce_customer_billing';
+-  $handler->display->display_options['style_options']['columns'] = array(
+-    'sku' => 'sku',
+-    'line_item_label' => 'line_item_label',
+-    'quantity' => 'quantity',
+-    'commerce_customer_billing' => 'commerce_customer_billing',
+-  );
+-  $handler->display->display_options['style_options']['default'] = '-1';
+-  $handler->display->display_options['style_options']['info'] = array(
+-    'sku' => array(
+-      'sortable' => 0,
+-      'default_sort_order' => 'asc',
+-      'align' => '',
+-      'separator' => '',
+-    ),
+-    'line_item_label' => array(
+-      'sortable' => 0,
+-      'default_sort_order' => 'asc',
+-      'align' => '',
+-      'separator' => '',
+-    ),
+-    'quantity' => array(
+-      'sortable' => 0,
+-      'default_sort_order' => 'asc',
+-      'align' => '',
+-      'separator' => '',
+-    ),
+-    'commerce_customer_billing' => array(
+-      'sortable' => 0,
+-      'default_sort_order' => 'asc',
+-      'align' => '',
+-      'separator' => '',
+-    ),
+-  );
+-  $handler->display->display_options['style_options']['override'] = 1;
+-  $handler->display->display_options['style_options']['sticky'] = 0;
+-  $handler->display->display_options['style_options']['empty_table'] = 0;
+-  /* Header: Global: Text area */
+-  $handler->display->display_options['header']['area']['id'] = 'area';
+-  $handler->display->display_options['header']['area']['table'] = 'views';
+-  $handler->display->display_options['header']['area']['field'] = 'area';
+-  $handler->display->display_options['header']['area']['empty'] = FALSE;
+-  /* Relationship: Line item: Referenced product */
+-  $handler->display->display_options['relationships']['commerce_product_product_id']['id'] = 'commerce_product_product_id';
+-  $handler->display->display_options['relationships']['commerce_product_product_id']['table'] = 'field_data_commerce_product';
+-  $handler->display->display_options['relationships']['commerce_product_product_id']['field'] = 'commerce_product_product_id';
+-  $handler->display->display_options['relationships']['commerce_product_product_id']['required'] = 0;
+-  /* Relationship: Commerce Line Item: Order ID */
+-  $handler->display->display_options['relationships']['order_id']['id'] = 'order_id';
+-  $handler->display->display_options['relationships']['order_id']['table'] = 'commerce_line_item';
+-  $handler->display->display_options['relationships']['order_id']['field'] = 'order_id';
+-  $handler->display->display_options['relationships']['order_id']['required'] = 0;
+-  /* Field: Commerce Product: SKU */
+-  $handler->display->display_options['fields']['sku']['id'] = 'sku';
+-  $handler->display->display_options['fields']['sku']['table'] = 'commerce_product';
+-  $handler->display->display_options['fields']['sku']['field'] = 'sku';
+-  $handler->display->display_options['fields']['sku']['relationship'] = 'commerce_product_product_id';
+-  $handler->display->display_options['fields']['sku']['alter']['alter_text'] = 0;
+-  $handler->display->display_options['fields']['sku']['alter']['make_link'] = 0;
+-  $handler->display->display_options['fields']['sku']['alter']['absolute'] = 0;
+-  $handler->display->display_options['fields']['sku']['alter']['external'] = 0;
+-  $handler->display->display_options['fields']['sku']['alter']['trim'] = 0;
+-  $handler->display->display_options['fields']['sku']['alter']['nl2br'] = 0;
+-  $handler->display->display_options['fields']['sku']['alter']['word_boundary'] = 1;
+-  $handler->display->display_options['fields']['sku']['alter']['ellipsis'] = 1;
+-  $handler->display->display_options['fields']['sku']['alter']['strip_tags'] = 0;
+-  $handler->display->display_options['fields']['sku']['alter']['html'] = 0;
+-  $handler->display->display_options['fields']['sku']['element_label_colon'] = 1;
+-  $handler->display->display_options['fields']['sku']['element_default_classes'] = 1;
+-  $handler->display->display_options['fields']['sku']['hide_empty'] = 0;
+-  $handler->display->display_options['fields']['sku']['empty_zero'] = 0;
+-  $handler->display->display_options['fields']['sku']['link_to_product'] = 0;
+-  /* Field: Commerce Line Item: Label */
+-  $handler->display->display_options['fields']['line_item_label']['id'] = 'line_item_label';
+-  $handler->display->display_options['fields']['line_item_label']['table'] = 'commerce_line_item';
+-  $handler->display->display_options['fields']['line_item_label']['field'] = 'line_item_label';
+-  $handler->display->display_options['fields']['line_item_label']['alter']['alter_text'] = 0;
+-  $handler->display->display_options['fields']['line_item_label']['alter']['make_link'] = 0;
+-  $handler->display->display_options['fields']['line_item_label']['alter']['absolute'] = 0;
+-  $handler->display->display_options['fields']['line_item_label']['alter']['external'] = 0;
+-  $handler->display->display_options['fields']['line_item_label']['alter']['trim'] = 0;
+-  $handler->display->display_options['fields']['line_item_label']['alter']['nl2br'] = 0;
+-  $handler->display->display_options['fields']['line_item_label']['alter']['word_boundary'] = 1;
+-  $handler->display->display_options['fields']['line_item_label']['alter']['ellipsis'] = 1;
+-  $handler->display->display_options['fields']['line_item_label']['alter']['strip_tags'] = 0;
+-  $handler->display->display_options['fields']['line_item_label']['alter']['html'] = 0;
+-  $handler->display->display_options['fields']['line_item_label']['element_label_colon'] = 1;
+-  $handler->display->display_options['fields']['line_item_label']['element_default_classes'] = 1;
+-  $handler->display->display_options['fields']['line_item_label']['hide_empty'] = 0;
+-  $handler->display->display_options['fields']['line_item_label']['empty_zero'] = 0;
+-  /* Field: Commerce Line Item: Quantity */
+-  $handler->display->display_options['fields']['quantity']['id'] = 'quantity';
+-  $handler->display->display_options['fields']['quantity']['table'] = 'commerce_line_item';
+-  $handler->display->display_options['fields']['quantity']['field'] = 'quantity';
+-  $handler->display->display_options['fields']['quantity']['alter']['alter_text'] = 0;
+-  $handler->display->display_options['fields']['quantity']['alter']['make_link'] = 0;
+-  $handler->display->display_options['fields']['quantity']['alter']['absolute'] = 0;
+-  $handler->display->display_options['fields']['quantity']['alter']['external'] = 0;
+-  $handler->display->display_options['fields']['quantity']['alter']['trim'] = 0;
+-  $handler->display->display_options['fields']['quantity']['alter']['nl2br'] = 0;
+-  $handler->display->display_options['fields']['quantity']['alter']['word_boundary'] = 1;
+-  $handler->display->display_options['fields']['quantity']['alter']['ellipsis'] = 1;
+-  $handler->display->display_options['fields']['quantity']['alter']['strip_tags'] = 0;
+-  $handler->display->display_options['fields']['quantity']['alter']['html'] = 0;
+-  $handler->display->display_options['fields']['quantity']['element_label_colon'] = 1;
+-  $handler->display->display_options['fields']['quantity']['element_default_classes'] = 1;
+-  $handler->display->display_options['fields']['quantity']['hide_empty'] = 0;
+-  $handler->display->display_options['fields']['quantity']['empty_zero'] = 0;
+-  $handler->display->display_options['fields']['quantity']['set_precision'] = 0;
+-  $handler->display->display_options['fields']['quantity']['precision'] = '0';
+-  $handler->display->display_options['fields']['quantity']['format_plural'] = 0;
+-  /* Field: Order: Billing information */
+-  $handler->display->display_options['fields']['commerce_customer_billing']['id'] = 'commerce_customer_billing';
+-  $handler->display->display_options['fields']['commerce_customer_billing']['table'] = 'field_data_commerce_customer_billing';
+-  $handler->display->display_options['fields']['commerce_customer_billing']['field'] = 'commerce_customer_billing';
+-  $handler->display->display_options['fields']['commerce_customer_billing']['relationship'] = 'order_id';
+-  $handler->display->display_options['fields']['commerce_customer_billing']['exclude'] = TRUE;
+-  $handler->display->display_options['fields']['commerce_customer_billing']['alter']['alter_text'] = 0;
+-  $handler->display->display_options['fields']['commerce_customer_billing']['alter']['make_link'] = 0;
+-  $handler->display->display_options['fields']['commerce_customer_billing']['alter']['absolute'] = 0;
+-  $handler->display->display_options['fields']['commerce_customer_billing']['alter']['external'] = 0;
+-  $handler->display->display_options['fields']['commerce_customer_billing']['alter']['replace_spaces'] = 0;
+-  $handler->display->display_options['fields']['commerce_customer_billing']['alter']['trim'] = 0;
+-  $handler->display->display_options['fields']['commerce_customer_billing']['alter']['nl2br'] = 0;
+-  $handler->display->display_options['fields']['commerce_customer_billing']['alter']['word_boundary'] = 1;
+-  $handler->display->display_options['fields']['commerce_customer_billing']['alter']['ellipsis'] = 1;
+-  $handler->display->display_options['fields']['commerce_customer_billing']['alter']['strip_tags'] = 0;
+-  $handler->display->display_options['fields']['commerce_customer_billing']['alter']['html'] = 0;
+-  $handler->display->display_options['fields']['commerce_customer_billing']['element_label_colon'] = 1;
+-  $handler->display->display_options['fields']['commerce_customer_billing']['element_default_classes'] = 1;
+-  $handler->display->display_options['fields']['commerce_customer_billing']['hide_empty'] = 0;
+-  $handler->display->display_options['fields']['commerce_customer_billing']['empty_zero'] = 0;
+-  $handler->display->display_options['fields']['commerce_customer_billing']['type'] = 'commerce_customer_profile_reference_display';
+-  $handler->display->display_options['fields']['commerce_customer_billing']['field_api_classes'] = 0;
+-  /* Contextual filter: Line item: Delivery id (delivery_ref) */
+-  $handler->display->display_options['arguments']['delivery_ref_value']['id'] = 'delivery_ref_value';
+-  $handler->display->display_options['arguments']['delivery_ref_value']['table'] = 'field_data_delivery_ref';
+-  $handler->display->display_options['arguments']['delivery_ref_value']['field'] = 'delivery_ref_value';
+-  $handler->display->display_options['arguments']['delivery_ref_value']['title_enable'] = 1;
+-  $handler->display->display_options['arguments']['delivery_ref_value']['title'] = 'Delivery note # %1';
+-  $handler->display->display_options['arguments']['delivery_ref_value']['default_argument_type'] = 'fixed';
+-  $handler->display->display_options['arguments']['delivery_ref_value']['default_argument_skip_url'] = 0;
+-  $handler->display->display_options['arguments']['delivery_ref_value']['summary']['number_of_records'] = '0';
+-  $handler->display->display_options['arguments']['delivery_ref_value']['summary']['format'] = 'default_summary';
+-  $handler->display->display_options['arguments']['delivery_ref_value']['summary_options']['items_per_page'] = '25';
+-  $handler->display->display_options['arguments']['delivery_ref_value']['break_phrase'] = 0;
+-  $handler->display->display_options['arguments']['delivery_ref_value']['not'] = 0;
+-  /* Filter criterion: Product: Shippable (field_shippable) */
+-  $handler->display->display_options['filters'][$field_shippable . '_value']['id'] = $field_shippable . '_value';
+-  $handler->display->display_options['filters'][$field_shippable . '_value']['table'] = 'field_data_' . $field_shippable;
+-  $handler->display->display_options['filters'][$field_shippable . '_value']['field'] = $field_shippable . '_value';
+-  $handler->display->display_options['filters'][$field_shippable . '_value']['relationship'] = 'commerce_product_product_id';
+-  $handler->display->display_options['filters'][$field_shippable . '_value']['value'] = array(
+-    1 => '1',
+-  );
+-
+-  /* Display: Page */
+-  $handler = $view->new_display('page', 'Page', 'page');
+-  $handler->display->display_options['path'] = 'admin/commerce/deliveries/%/view';
+-  $handler->display->display_options['menu']['type'] = 'tab';
+-  $handler->display->display_options['menu']['title'] = 'View';
+-  $handler->display->display_options['menu']['weight'] = '0';
+-  $handler->display->display_options['tab_options']['weight'] = '0';
+-  $translatables['commerce_delivery_view'] = array(
+-    t('Master'),
+-    t('Commerce delivery view'),
+-    t('more'),
+-    t('Apply'),
+-    t('Reset'),
+-    t('Sort by'),
+-    t('Asc'),
+-    t('Desc'),
+-    t('Items per page'),
+-    t('- All -'),
+-    t('Offset'),
+-    t('Product'),
+-    t('Order'),
+-    t('SKU'),
+-    t('Label'),
+-    t('Quantity'),
+-    t('.'),
+-    t(','),
+-    t('Billing information'),
+-    t('All'),
+-    t('Delivery note # %1'),
+-    t('Page'),
+-  );
+-
+-  $views[$view->name] = $view;
+-
+-  $view = new view();
+-  $view->name = 'commerce_delivery_by_order';
+-  $view->description = 'Display a given order line items by delivery';
+-  $view->tag = 'commerce';
+-  $view->base_table = 'commerce_line_item';
+-  $view->human_name = 'Commerce delivery by order';
+-  $view->core = 7;
+-  $view->api_version = '3.0';
+-  $view->disabled = FALSE; /* Edit this to true to make a default view disabled initially */
+-
+-  /* Display: Master */
+-  $handler = $view->new_display('default', 'Master', 'default');
+-  $handler->display->display_options['use_more_always'] = FALSE;
+-  $handler->display->display_options['access']['type'] = 'perm';
+-  $handler->display->display_options['access']['perm'] = 'administer orders';
+-  $handler->display->display_options['cache']['type'] = 'none';
+-  $handler->display->display_options['query']['type'] = 'views_query';
+-  $handler->display->display_options['exposed_form']['type'] = 'basic';
+-  $handler->display->display_options['pager']['type'] = 'full';
+-  $handler->display->display_options['style_plugin'] = 'table';
+-  $handler->display->display_options['style_options']['grouping'] = 'delivery_ref';
+-  $handler->display->display_options['style_options']['columns'] = array(
+-    'delivery_ref' => 'delivery_ref',
+-    'order_id' => 'order_id',
+-    'sku' => 'sku',
+-    'line_item_label' => 'line_item_label',
+-    'quantity' => 'quantity',
+-    'set_delivery' => 'set_delivery',
+-  );
+-  $handler->display->display_options['style_options']['default'] = '-1';
+-  $handler->display->display_options['style_options']['info'] = array(
+-    'delivery_ref' => array(
+-      'sortable' => 0,
+-      'default_sort_order' => 'asc',
+-      'align' => '',
+-      'separator' => '',
+-    ),
+-    'order_id' => array(
+-      'sortable' => 0,
+-      'default_sort_order' => 'asc',
+-      'align' => '',
+-      'separator' => '',
+-    ),
+-    'sku' => array(
+-      'sortable' => 0,
+-      'default_sort_order' => 'asc',
+-      'align' => '',
+-      'separator' => '',
+-    ),
+-    'line_item_label' => array(
+-      'sortable' => 0,
+-      'default_sort_order' => 'asc',
+-      'align' => '',
+-      'separator' => '',
+-    ),
+-    'quantity' => array(
+-      'sortable' => 0,
+-      'default_sort_order' => 'asc',
+-      'align' => '',
+-      'separator' => '',
+-    ),
+-    'set_delivery' => array(
+-      'align' => '',
+-      'separator' => '',
+-    ),
+-  );
+-  $handler->display->display_options['style_options']['order'] = 'desc';
+-  /* No results behavior: Global: Text area */
+-  $handler->display->display_options['empty']['area']['id'] = 'area';
+-  $handler->display->display_options['empty']['area']['table'] = 'views';
+-  $handler->display->display_options['empty']['area']['field'] = 'area';
+-  $handler->display->display_options['empty']['area']['content'] = 'No results for this case.';
+-  /* Relationship: Commerce Line item: Referenced product */
+-  $handler->display->display_options['relationships']['commerce_product_product_id']['id'] = 'commerce_product_product_id';
+-  $handler->display->display_options['relationships']['commerce_product_product_id']['table'] = 'field_data_commerce_product';
+-  $handler->display->display_options['relationships']['commerce_product_product_id']['field'] = 'commerce_product_product_id';
+-  $handler->display->display_options['relationships']['commerce_product_product_id']['required'] = TRUE;
+-  /* Field: Commerce Line item: Delivery id */
+-  $handler->display->display_options['fields']['delivery_ref']['id'] = 'delivery_ref';
+-  $handler->display->display_options['fields']['delivery_ref']['table'] = 'field_data_delivery_ref';
+-  $handler->display->display_options['fields']['delivery_ref']['field'] = 'delivery_ref';
+-  $handler->display->display_options['fields']['delivery_ref']['exclude'] = TRUE;
+-  $handler->display->display_options['fields']['delivery_ref']['alter']['text'] = 'admin/commerce';
+-  $handler->display->display_options['fields']['delivery_ref']['alter']['make_link'] = TRUE;
+-  $handler->display->display_options['fields']['delivery_ref']['alter']['path'] = 'admin/commerce/deliveries/[delivery_ref-value]/view';
+-  $handler->display->display_options['fields']['delivery_ref']['alter']['absolute'] = TRUE;
+-  $handler->display->display_options['fields']['delivery_ref']['empty'] = 'Not currently in a delivery';
+-  $handler->display->display_options['fields']['delivery_ref']['settings'] = array(
+-    'thousand_separator' => ' ',
+-    'prefix_suffix' => 1,
+-  );
+-  /* Field: Commerce Line Item: Order ID */
+-  $handler->display->display_options['fields']['order_id']['id'] = 'order_id';
+-  $handler->display->display_options['fields']['order_id']['table'] = 'commerce_line_item';
+-  $handler->display->display_options['fields']['order_id']['field'] = 'order_id';
+-  $handler->display->display_options['fields']['order_id']['exclude'] = TRUE;
+-  /* Field: Commerce Product: SKU */
+-  $handler->display->display_options['fields']['sku']['id'] = 'sku';
+-  $handler->display->display_options['fields']['sku']['table'] = 'commerce_product';
+-  $handler->display->display_options['fields']['sku']['field'] = 'sku';
+-  $handler->display->display_options['fields']['sku']['relationship'] = 'commerce_product_product_id';
+-  $handler->display->display_options['fields']['sku']['link_to_product'] = 0;
+-  /* Field: Commerce Line Item: Label */
+-  $handler->display->display_options['fields']['line_item_label']['id'] = 'line_item_label';
+-  $handler->display->display_options['fields']['line_item_label']['table'] = 'commerce_line_item';
+-  $handler->display->display_options['fields']['line_item_label']['field'] = 'line_item_label';
+-  /* Field: Commerce Line Item: Quantity */
+-  $handler->display->display_options['fields']['quantity']['id'] = 'quantity';
+-  $handler->display->display_options['fields']['quantity']['table'] = 'commerce_line_item';
+-  $handler->display->display_options['fields']['quantity']['field'] = 'quantity';
+-  $handler->display->display_options['fields']['quantity']['precision'] = '0';
+-  /* Field: Commerce Line Item: Move item to delivery */
+-  $handler->display->display_options['fields']['set_delivery']['id'] = 'set_delivery';
+-  $handler->display->display_options['fields']['set_delivery']['table'] = 'commerce_line_item';
+-  $handler->display->display_options['fields']['set_delivery']['field'] = 'set_delivery';
+-  /* Sort criterion: Commerce Line item: Delivery id (delivery_ref) */
+-  $handler->display->display_options['sorts']['delivery_ref_value']['id'] = 'delivery_ref_value';
+-  $handler->display->display_options['sorts']['delivery_ref_value']['table'] = 'field_data_delivery_ref';
+-  $handler->display->display_options['sorts']['delivery_ref_value']['field'] = 'delivery_ref_value';
+-  /* Contextual filter: Commerce Line Item: Order ID */
+-  $handler->display->display_options['arguments']['order_id']['id'] = 'order_id';
+-  $handler->display->display_options['arguments']['order_id']['table'] = 'commerce_line_item';
+-  $handler->display->display_options['arguments']['order_id']['field'] = 'order_id';
+-  $handler->display->display_options['arguments']['order_id']['default_action'] = 'empty';
+-  $handler->display->display_options['arguments']['order_id']['title_enable'] = TRUE;
+-  $handler->display->display_options['arguments']['order_id']['title'] = 'Order %1';
+-  $handler->display->display_options['arguments']['order_id']['breadcrumb_enable'] = TRUE;
+-  $handler->display->display_options['arguments']['order_id']['breadcrumb'] = 'Title';
+-  $handler->display->display_options['arguments']['order_id']['default_argument_type'] = 'fixed';
+-  $handler->display->display_options['arguments']['order_id']['summary']['number_of_records'] = '0';
+-  $handler->display->display_options['arguments']['order_id']['summary']['format'] = 'default_summary';
+-  $handler->display->display_options['arguments']['order_id']['summary_options']['items_per_page'] = '25';
+-  $handler->display->display_options['arguments']['order_id']['specify_validation'] = TRUE;
+-  $handler->display->display_options['arguments']['order_id']['validate']['type'] = 'numeric';
+-  $handler->display->display_options['arguments']['order_id']['validate']['fail'] = 'empty';
+-  /* Filter criterion: Fields: Shippable (field_shippable) */
+-  $handler->display->display_options['filters'][$field_shippable . '_value']['id'] = $field_shippable . '_value';
+-  $handler->display->display_options['filters'][$field_shippable . '_value']['table'] = 'field_data_' . $field_shippable;
+-  $handler->display->display_options['filters'][$field_shippable . '_value']['field'] = $field_shippable . '_value';
+-  $handler->display->display_options['filters'][$field_shippable . '_value']['relationship'] = 'commerce_product_product_id';
+-  $handler->display->display_options['filters'][$field_shippable . '_value']['value'] = array(
+-    1 => '1',
+-  );
+-  $translatables['commerce_delivery_by_order'] = array(
+-    t('Master'),
+-    t('more'),
+-    t('Apply'),
+-    t('Reset'),
+-    t('Sort by'),
+-    t('Asc'),
+-    t('Desc'),
+-    t('Items per page'),
+-    t('- All -'),
+-    t('Offset'),
+-    t('No results for this case.'),
+-    t('Product'),
+-    t('Delivery id'),
+-    t('admin/commerce'),
+-    t('admin/commerce/deliveries/[delivery_ref-value]/view'),
+-    t('Order ID'),
+-    t('SKU'),
+-    t('Label'),
+-    t('Quantity'),
+-    t('.'),
+-    t(','),
+-    t('Move item to delivery'),
+-    t('All'),
+-    t('Order %1'),
+-    t('Title'),
+-  );
+-
+-  $views[$view->name] = $view;
+-
+-
+-  $view = new view;
+-  $view->name = 'commerce_delivery_for_order';
+-  $view->description = 'Displays orders deliveries for customers.';
+-  $view->tag = 'commerce';
+-  $view->base_table = 'commerce_line_item';
+-  $view->human_name = 'Commerce delivery for order';
+-  $view->core = 7;
+-  $view->api_version = '3.0-alpha1';
+-  $view->disabled = FALSE; /* Edit this to true to make a default view disabled initially */
+-
+-  /* Display: Master */
+-  $handler = $view->new_display('default', 'Master', 'default');
+-  $handler->display->display_options['access']['type'] = 'none';
+-  $handler->display->display_options['cache']['type'] = 'none';
+-  $handler->display->display_options['query']['type'] = 'views_query';
+-  $handler->display->display_options['query']['options']['query_comment'] = FALSE;
+-  $handler->display->display_options['exposed_form']['type'] = 'basic';
+-  $handler->display->display_options['pager']['type'] = 'full';
+-  $handler->display->display_options['style_plugin'] = 'table';
+-  $handler->display->display_options['style_options']['grouping'] = 'delivery_ref';
+-  $handler->display->display_options['style_options']['columns'] = array(
+-    'title' => 'title',
+-    'commerce_unit_price' => 'commerce_unit_price',
+-    'quantity' => 'quantity',
+-    'commerce_total' => 'commerce_total',
+-    'delivery_ref' => 'delivery_ref',
+-  );
+-  $handler->display->display_options['style_options']['default'] = '-1';
+-  $handler->display->display_options['style_options']['info'] = array(
+-    'title' => array(
+-      'sortable' => 0,
+-      'default_sort_order' => 'asc',
+-      'align' => '',
+-      'separator' => '',
+-    ),
+-    'commerce_unit_price' => array(
+-      'sortable' => 0,
+-      'default_sort_order' => 'asc',
+-      'align' => '',
+-      'separator' => '',
+-    ),
+-    'quantity' => array(
+-      'sortable' => 0,
+-      'default_sort_order' => 'asc',
+-      'align' => '',
+-      'separator' => '',
+-    ),
+-    'commerce_total' => array(
+-      'sortable' => 0,
+-      'default_sort_order' => 'asc',
+-      'align' => '',
+-      'separator' => '',
+-    ),
+-    'delivery_ref' => array(
+-      'sortable' => 0,
+-      'default_sort_order' => 'asc',
+-      'align' => '',
+-      'separator' => '',
+-    ),
+-  );
+-  $handler->display->display_options['style_options']['override'] = 1;
+-  $handler->display->display_options['style_options']['sticky'] = 0;
+-  $handler->display->display_options['style_options']['empty_table'] = 0;
+-  /* Relationship: Commerce Line item: Referenced product */
+-  $handler->display->display_options['relationships']['commerce_product_product_id']['id'] = 'commerce_product_product_id';
+-  $handler->display->display_options['relationships']['commerce_product_product_id']['table'] = 'field_data_commerce_product';
+-  $handler->display->display_options['relationships']['commerce_product_product_id']['field'] = 'commerce_product_product_id';
+-  $handler->display->display_options['relationships']['commerce_product_product_id']['required'] = 1;
+-  /* Field: Commerce Line item: Delivery id */
+-  $handler->display->display_options['fields']['delivery_ref']['id'] = 'delivery_ref';
+-  $handler->display->display_options['fields']['delivery_ref']['table'] = 'field_data_delivery_ref';
+-  $handler->display->display_options['fields']['delivery_ref']['field'] = 'delivery_ref';
+-  $handler->display->display_options['fields']['delivery_ref']['exclude'] = TRUE;
+-  $handler->display->display_options['fields']['delivery_ref']['alter']['alter_text'] = 0;
+-  $handler->display->display_options['fields']['delivery_ref']['alter']['make_link'] = 0;
+-  $handler->display->display_options['fields']['delivery_ref']['alter']['absolute'] = 0;
+-  $handler->display->display_options['fields']['delivery_ref']['alter']['external'] = 0;
+-  $handler->display->display_options['fields']['delivery_ref']['alter']['replace_spaces'] = 0;
+-  $handler->display->display_options['fields']['delivery_ref']['alter']['trim_whitespace'] = 0;
+-  $handler->display->display_options['fields']['delivery_ref']['alter']['nl2br'] = 0;
+-  $handler->display->display_options['fields']['delivery_ref']['alter']['word_boundary'] = 1;
+-  $handler->display->display_options['fields']['delivery_ref']['alter']['ellipsis'] = 1;
+-  $handler->display->display_options['fields']['delivery_ref']['alter']['strip_tags'] = 0;
+-  $handler->display->display_options['fields']['delivery_ref']['alter']['trim'] = 0;
+-  $handler->display->display_options['fields']['delivery_ref']['alter']['html'] = 0;
+-  $handler->display->display_options['fields']['delivery_ref']['element_label_colon'] = 1;
+-  $handler->display->display_options['fields']['delivery_ref']['element_default_classes'] = 1;
+-  $handler->display->display_options['fields']['delivery_ref']['hide_empty'] = 0;
+-  $handler->display->display_options['fields']['delivery_ref']['empty_zero'] = 0;
+-  $handler->display->display_options['fields']['delivery_ref']['hide_alter_empty'] = 0;
+-  $handler->display->display_options['fields']['delivery_ref']['settings'] = array(
+-    'thousand_separator' => ' ',
+-    'prefix_suffix' => 1,
+-  );
+-  $handler->display->display_options['fields']['delivery_ref']['field_api_classes'] = 0;
+-  /* Field: Commerce Product: Title */
+-  $handler->display->display_options['fields']['title']['id'] = 'title';
+-  $handler->display->display_options['fields']['title']['table'] = 'commerce_product';
+-  $handler->display->display_options['fields']['title']['field'] = 'title';
+-  $handler->display->display_options['fields']['title']['relationship'] = 'commerce_product_product_id';
+-  $handler->display->display_options['fields']['title']['alter']['alter_text'] = 0;
+-  $handler->display->display_options['fields']['title']['alter']['make_link'] = 0;
+-  $handler->display->display_options['fields']['title']['alter']['absolute'] = 0;
+-  $handler->display->display_options['fields']['title']['alter']['external'] = 0;
+-  $handler->display->display_options['fields']['title']['alter']['replace_spaces'] = 0;
+-  $handler->display->display_options['fields']['title']['alter']['trim_whitespace'] = 0;
+-  $handler->display->display_options['fields']['title']['alter']['nl2br'] = 0;
+-  $handler->display->display_options['fields']['title']['alter']['word_boundary'] = 1;
+-  $handler->display->display_options['fields']['title']['alter']['ellipsis'] = 1;
+-  $handler->display->display_options['fields']['title']['alter']['strip_tags'] = 0;
+-  $handler->display->display_options['fields']['title']['alter']['trim'] = 0;
+-  $handler->display->display_options['fields']['title']['alter']['html'] = 0;
+-  $handler->display->display_options['fields']['title']['element_label_colon'] = 1;
+-  $handler->display->display_options['fields']['title']['element_default_classes'] = 1;
+-  $handler->display->display_options['fields']['title']['hide_empty'] = 0;
+-  $handler->display->display_options['fields']['title']['empty_zero'] = 0;
+-  $handler->display->display_options['fields']['title']['hide_alter_empty'] = 0;
+-  $handler->display->display_options['fields']['title']['link_to_product'] = 0;
+-  /* Field: Commerce Line item: Unit price */
+-  $handler->display->display_options['fields']['commerce_unit_price']['id'] = 'commerce_unit_price';
+-  $handler->display->display_options['fields']['commerce_unit_price']['table'] = 'field_data_commerce_unit_price';
+-  $handler->display->display_options['fields']['commerce_unit_price']['field'] = 'commerce_unit_price';
+-  $handler->display->display_options['fields']['commerce_unit_price']['alter']['alter_text'] = 0;
+-  $handler->display->display_options['fields']['commerce_unit_price']['alter']['make_link'] = 0;
+-  $handler->display->display_options['fields']['commerce_unit_price']['alter']['absolute'] = 0;
+-  $handler->display->display_options['fields']['commerce_unit_price']['alter']['external'] = 0;
+-  $handler->display->display_options['fields']['commerce_unit_price']['alter']['replace_spaces'] = 0;
+-  $handler->display->display_options['fields']['commerce_unit_price']['alter']['trim_whitespace'] = 0;
+-  $handler->display->display_options['fields']['commerce_unit_price']['alter']['nl2br'] = 0;
+-  $handler->display->display_options['fields']['commerce_unit_price']['alter']['word_boundary'] = 1;
+-  $handler->display->display_options['fields']['commerce_unit_price']['alter']['ellipsis'] = 1;
+-  $handler->display->display_options['fields']['commerce_unit_price']['alter']['strip_tags'] = 0;
+-  $handler->display->display_options['fields']['commerce_unit_price']['alter']['trim'] = 0;
+-  $handler->display->display_options['fields']['commerce_unit_price']['alter']['html'] = 0;
+-  $handler->display->display_options['fields']['commerce_unit_price']['element_label_colon'] = 1;
+-  $handler->display->display_options['fields']['commerce_unit_price']['element_default_classes'] = 1;
+-  $handler->display->display_options['fields']['commerce_unit_price']['hide_empty'] = 0;
+-  $handler->display->display_options['fields']['commerce_unit_price']['empty_zero'] = 0;
+-  $handler->display->display_options['fields']['commerce_unit_price']['hide_alter_empty'] = 0;
+-  $handler->display->display_options['fields']['commerce_unit_price']['click_sort_column'] = 'amount';
+-  $handler->display->display_options['fields']['commerce_unit_price']['type'] = 'commerce_price_formatted_amount';
+-  $handler->display->display_options['fields']['commerce_unit_price']['settings'] = array(
+-    'calculation' => FALSE,
+-  );
+-  $handler->display->display_options['fields']['commerce_unit_price']['field_api_classes'] = 0;
+-  /* Field: Commerce Line Item: Quantity */
+-  $handler->display->display_options['fields']['quantity']['id'] = 'quantity';
+-  $handler->display->display_options['fields']['quantity']['table'] = 'commerce_line_item';
+-  $handler->display->display_options['fields']['quantity']['field'] = 'quantity';
+-  $handler->display->display_options['fields']['quantity']['alter']['alter_text'] = 0;
+-  $handler->display->display_options['fields']['quantity']['alter']['make_link'] = 0;
+-  $handler->display->display_options['fields']['quantity']['alter']['absolute'] = 0;
+-  $handler->display->display_options['fields']['quantity']['alter']['external'] = 0;
+-  $handler->display->display_options['fields']['quantity']['alter']['replace_spaces'] = 0;
+-  $handler->display->display_options['fields']['quantity']['alter']['trim_whitespace'] = 0;
+-  $handler->display->display_options['fields']['quantity']['alter']['nl2br'] = 0;
+-  $handler->display->display_options['fields']['quantity']['alter']['word_boundary'] = 1;
+-  $handler->display->display_options['fields']['quantity']['alter']['ellipsis'] = 1;
+-  $handler->display->display_options['fields']['quantity']['alter']['strip_tags'] = 0;
+-  $handler->display->display_options['fields']['quantity']['alter']['trim'] = 0;
+-  $handler->display->display_options['fields']['quantity']['alter']['html'] = 0;
+-  $handler->display->display_options['fields']['quantity']['element_label_colon'] = 1;
+-  $handler->display->display_options['fields']['quantity']['element_default_classes'] = 1;
+-  $handler->display->display_options['fields']['quantity']['hide_empty'] = 0;
+-  $handler->display->display_options['fields']['quantity']['empty_zero'] = 0;
+-  $handler->display->display_options['fields']['quantity']['hide_alter_empty'] = 0;
+-  $handler->display->display_options['fields']['quantity']['set_precision'] = 0;
+-  $handler->display->display_options['fields']['quantity']['precision'] = '0';
+-  $handler->display->display_options['fields']['quantity']['format_plural'] = 0;
+-  /* Field: Commerce Line item: Total */
+-  $handler->display->display_options['fields']['commerce_total']['id'] = 'commerce_total';
+-  $handler->display->display_options['fields']['commerce_total']['table'] = 'field_data_commerce_total';
+-  $handler->display->display_options['fields']['commerce_total']['field'] = 'commerce_total';
+-  $handler->display->display_options['fields']['commerce_total']['alter']['alter_text'] = 0;
+-  $handler->display->display_options['fields']['commerce_total']['alter']['make_link'] = 0;
+-  $handler->display->display_options['fields']['commerce_total']['alter']['absolute'] = 0;
+-  $handler->display->display_options['fields']['commerce_total']['alter']['external'] = 0;
+-  $handler->display->display_options['fields']['commerce_total']['alter']['replace_spaces'] = 0;
+-  $handler->display->display_options['fields']['commerce_total']['alter']['trim_whitespace'] = 0;
+-  $handler->display->display_options['fields']['commerce_total']['alter']['nl2br'] = 0;
+-  $handler->display->display_options['fields']['commerce_total']['alter']['word_boundary'] = 1;
+-  $handler->display->display_options['fields']['commerce_total']['alter']['ellipsis'] = 1;
+-  $handler->display->display_options['fields']['commerce_total']['alter']['strip_tags'] = 0;
+-  $handler->display->display_options['fields']['commerce_total']['alter']['trim'] = 0;
+-  $handler->display->display_options['fields']['commerce_total']['alter']['html'] = 0;
+-  $handler->display->display_options['fields']['commerce_total']['element_label_colon'] = 1;
+-  $handler->display->display_options['fields']['commerce_total']['element_default_classes'] = 1;
+-  $handler->display->display_options['fields']['commerce_total']['hide_empty'] = 0;
+-  $handler->display->display_options['fields']['commerce_total']['empty_zero'] = 0;
+-  $handler->display->display_options['fields']['commerce_total']['hide_alter_empty'] = 0;
+-  $handler->display->display_options['fields']['commerce_total']['click_sort_column'] = 'amount';
+-  $handler->display->display_options['fields']['commerce_total']['type'] = 'commerce_price_formatted_amount';
+-  $handler->display->display_options['fields']['commerce_total']['settings'] = array(
+-    'calculation' => FALSE,
+-  );
+-  $handler->display->display_options['fields']['commerce_total']['field_api_classes'] = 0;
+-  /* Sort criterion: Commerce Line item: Delivery id (delivery_ref) */
+-  $handler->display->display_options['sorts']['delivery_ref_value']['id'] = 'delivery_ref_value';
+-  $handler->display->display_options['sorts']['delivery_ref_value']['table'] = 'field_data_delivery_ref';
+-  $handler->display->display_options['sorts']['delivery_ref_value']['field'] = 'delivery_ref_value';
+-  /* Contextual filter: Commerce Line Item: Order ID */
+-  $handler->display->display_options['arguments']['order_id']['id'] = 'order_id';
+-  $handler->display->display_options['arguments']['order_id']['table'] = 'commerce_line_item';
+-  $handler->display->display_options['arguments']['order_id']['field'] = 'order_id';
+-  $handler->display->display_options['arguments']['order_id']['default_action'] = 'not found';
+-  $handler->display->display_options['arguments']['order_id']['default_argument_type'] = 'fixed';
+-  $handler->display->display_options['arguments']['order_id']['default_argument_skip_url'] = 0;
+-  $handler->display->display_options['arguments']['order_id']['summary']['number_of_records'] = '0';
+-  $handler->display->display_options['arguments']['order_id']['summary']['format'] = 'default_summary';
+-  $handler->display->display_options['arguments']['order_id']['summary_options']['items_per_page'] = '25';
+-  $handler->display->display_options['arguments']['order_id']['break_phrase'] = 0;
+-  $handler->display->display_options['arguments']['order_id']['not'] = 0;
+-  /* Filter criterion: Commerce Product: Levererbar (field_prod_ent_deliverable) */
+-  $handler->display->display_options['filters']['field_prod_ent_deliverable_value']['id'] = 'field_prod_ent_deliverable_value';
+-  $handler->display->display_options['filters']['field_prod_ent_deliverable_value']['table'] = 'field_data_field_prod_ent_deliverable';
+-  $handler->display->display_options['filters']['field_prod_ent_deliverable_value']['field'] = 'field_prod_ent_deliverable_value';
+-  $handler->display->display_options['filters']['field_prod_ent_deliverable_value']['relationship'] = 'commerce_product_product_id';
+-  $handler->display->display_options['filters']['field_prod_ent_deliverable_value']['value'] = array(
+-    1 => '1',
+-  );
+-  $translatables['commerce_delivery_for_order'] = array(
+-    t('Master'),
+-    t('more'),
+-    t('Apply'),
+-    t('Reset'),
+-    t('Sort by'),
+-    t('Asc'),
+-    t('Desc'),
+-    t('Items per page'),
+-    t('- All -'),
+-    t('Offset'),
+-    t('Product'),
+-    t('Delivery id'),
+-    t('Title'),
+-    t('Unit price'),
+-    t('Quantity'),
+-    t('.'),
+-    t(','),
+-    t('Total'),
+-    t('All'),
+-  );
+-
+-  $views[$view->name] = $view;
+-
+-  return $views;
+-}
+-
+diff --git a/includes/commerce_delivery_handler_field_delivery_status.inc b/includes/commerce_delivery_handler_field_delivery_status.inc
+deleted file mode 100644
+index 6eecfa6..0000000
+--- a/includes/commerce_delivery_handler_field_delivery_status.inc
++++ /dev/null
+@@ -1,13 +0,0 @@
+-<?php
+-
+-/**
+- * @file
+- * Field handler to select a delivery status.
+- */
+-class commerce_delivery_handler_field_delivery_status extends views_handler_field {
+-  function render($values) {
+-    $value = commerce_delivery_status_get_title($values->{$this->field_alias});
+-    // Only attempt to render a valid order status.
+-      return $value;
+-  }
+-}
+diff --git a/includes/commerce_delivery_handler_field_line_item_delivery.inc b/includes/commerce_delivery_handler_field_line_item_delivery.inc
+deleted file mode 100644
+index 20523c0..0000000
+--- a/includes/commerce_delivery_handler_field_line_item_delivery.inc
++++ /dev/null
+@@ -1,18 +0,0 @@
+-<?php
+-
+-/**
+- * @file
+- * Contains the basic delivery field handler.
+- */
+-
+-/**
+- * Field handler to provide simple renderer that allows linking to an order.
+- */
+-class commerce_delivery_handler_field_line_item_delivery extends views_handler_field {
+-	function query() {
+-		$result = db_query("SELECT li.delivery_ref_value FROM {field_data_delivery_ref} li WHERE li.line_item_id IN (:line_item_ids)", array(':line_item_ids' => $this->value));
+-		foreach ($result as $line_item) {
+-			$values[] = intval($line_item->delivery_ref_value);
+-		}
+-	}
+-}
+diff --git a/includes/commerce_delivery_handler_filter_delivery_status.inc b/includes/commerce_delivery_handler_filter_delivery_status.inc
+deleted file mode 100644
+index e7cab0e..0000000
+--- a/includes/commerce_delivery_handler_filter_delivery_status.inc
++++ /dev/null
+@@ -1,11 +0,0 @@
+-<?php
+-
+-/**
+- * @file
+- * Field handler to select a delivery status.
+- */
+-class commerce_delivery_handler_filter_delivery_status extends views_handler_filter_in_operator {
+-  function get_value_options() {
+-    $this->value_options = commerce_delivery_get_status();
+-  }
+-}
+diff --git a/includes/commerce_delivery_handler_line_item_set_delivery.inc b/includes/commerce_delivery_handler_line_item_set_delivery.inc
+deleted file mode 100644
+index f3bb5c8..0000000
+--- a/includes/commerce_delivery_handler_line_item_set_delivery.inc
++++ /dev/null
+@@ -1,47 +0,0 @@
+-<?php
+-
+-/**
+- * @file
+- * Field handler to present an order's operations links.
+- */
+-class commerce_delivery_handler_line_item_set_delivery extends views_handler_field {
+-  function construct() {
+-    parent::construct();
+-
+-    $this->additional_fields['order_id'] = 'order_id';
+-    $this->additional_fields['line_item_id'] = 'line_item_id';
+-  }
+-
+-  function query() {
+-    $this->ensure_my_table();
+-    $this->add_additional_fields();
+-  }
+-
+-  function render($values) {
+-    $destination = drupal_get_destination();
+-    $order_id = $values->{$this->aliases['order_id']};
+-    $line_item_id = $values->{$this->aliases['line_item_id']};
+-    $line_item = current(entity_load('commerce_line_item', array($line_item_id)));
+-    $wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
+-    $current_delivery_id = $wrapper->delivery_ref->value();
+-
+-    $deliveries = commerce_delivery_get_deliveries($order_id, 'active');
+-
+-    foreach ($deliveries as $type) {
+-      foreach ($type as $delivery) {
+-        if ($current_delivery_id != $delivery->delivery_id) {
+-          $query = $destination;
+-          $query['token'] = commerce_delivery_get_token($order_id, $line_item_id, $delivery->delivery_id);
+-          $links[$delivery->delivery_id] = array(
+-            'title' => $delivery->delivery_id,
+-            'href' => 'admin/commerce/orders/' . $order_id . '/deliveries/move/' . $line_item_id . '/' . $delivery->delivery_id,
+-            'query' => $query,
+-          );
+-        }
+-      }
+-    }
+-    if (!empty($links)) {
+-      return theme('links', array('links' => $links, 'attributes' => array('arguments' => $destination, 'class' => array('links', 'inline', 'operations'))));
+-    }
+-  }
+-}
+diff --git a/includes/views/commerce_delivery.views.inc b/includes/views/commerce_delivery.views.inc
+new file mode 100644
+index 0000000..00dd644
+--- /dev/null
++++ b/includes/views/commerce_delivery.views.inc
+@@ -0,0 +1,178 @@
++<?php
++
++/**
++ * @file
++ * Export Drupal Commerce deliveries to Views.
++ */
++
++/**
++ * Implements hook_views_data().
++ */
++function commerce_delivery_views_data() {
++  $data = array();
++
++  $data['commerce_delivery']['table']['group']  = t('Commerce Delivery');
++
++  $data['commerce_delivery']['table']['base'] = array(
++    'field' => 'delivery_id',
++    'title' => t('Commerce Delivery'),
++    'help' => t('Delivery.'),
++  );
++
++  // Expose the order ID.
++  $data['commerce_delivery']['order_id'] = array(
++    'title' => t('Order ID'),
++    'help' => t('The unique internal identifier of the order.'),
++    'field' => array(
++      'handler' => 'views_handler_field',
++      'click sortable' => TRUE,
++    ),
++    'filter' => array(
++      'handler' => 'views_handler_filter_numeric',
++    ),
++    'sort' => array(
++      'handler' => 'views_handler_sort',
++    ),
++    'argument' => array(
++      'handler' => 'views_handler_argument_numeric',
++      'name field' => 'order_number',
++      'numeric' => TRUE,
++      'validate type' => 'order_id',
++    ),
++    'relationship' => array(
++       'base' => 'commerce_order',
++       'field' => 'order_id',
++       'handler' => 'views_handler_relationship',
++       'label' => t('Order ID'),
++    ),
++  );
++
++  // Expose the delivery id.
++  $data['commerce_delivery']['delivery_id'] = array(
++    'title' => t('Delivery id'),
++    'help' => t('The delive id.'),
++    'field' => array(
++      'handler' => 'views_handler_field',
++      'click sortable' => TRUE,
++    ),
++    'filter' => array(
++      'handler' => 'views_handler_filter_numeric',
++    ),
++    'sort' => array(
++      'handler' => 'views_handler_sort',
++    ),
++    'argument' => array(
++      'handler' => 'views_handler_argument_numeric',
++    ),
++  );
++
++  // Expose the delivery status.
++  $data['commerce_delivery']['status'] = array(
++    'title' => t('Delivery status'),
++    'help' => t('The workflow status of the delivery.'),
++    'field' => array(
++      'handler' => 'commerce_delivery_handler_field_delivery_status',
++      'click sortable' => TRUE,
++    ),
++    'filter' => array(
++      'handler' => 'commerce_delivery_handler_filter_delivery_status',
++    ),
++    'sort' => array(
++      'handler' => 'views_handler_sort',
++    ),
++    'argument' => array(
++      'handler' => 'views_handler_argument_numeric',
++    ),
++  );
++
++  // Expose the delivery items.
++  $data['commerce_delivery']['items'] = array(
++    'field' => array(
++      'title' => t('Delivery items'),
++      'help' => t('The products assigned to the delivery.'),
++      'handler' => 'commerce_delivery_handler_field_delivery_items',
++    ),
++  );
++
++  // Expose the delivery action links.
++  $data['commerce_delivery']['operations'] = array(
++    'field' => array(
++      'title' => t('Operations links'),
++      'help' => t('Display all the available operations links for the delivery.'),
++      'handler' => 'commerce_delivery_handler_field_delivery_operations',
++    ),
++  );
++
++  // Expose the created and changed timestamps.
++  $data['commerce_delivery']['created'] = array(
++    'title' => t('Created date'),
++    'help' => t('The date the delivery was created.'),
++    'field' => array(
++      'handler' => 'views_handler_field_date',
++      'click sortable' => TRUE,
++    ),
++    'sort' => array(
++      'handler' => 'views_handler_sort_date',
++    ),
++    'filter' => array(
++      'handler' => 'views_handler_filter_date',
++    ),
++  );
++
++  $data['commerce_delivery']['changed'] = array(
++    'title' => t('Updated date'),
++    'help' => t('The date the order was last updated.'),
++    'field' => array(
++      'handler' => 'views_handler_field_date',
++      'click sortable' => TRUE,
++    ),
++    'sort' => array(
++      'handler' => 'views_handler_sort_date',
++    ),
++    'filter' => array(
++      'handler' => 'views_handler_filter_date',
++    ),
++  );
++
++  // Expose links to operate on the line item delivery.
++  $data['commerce_line_item']['set_delivery'] = array(
++    'field' => array(
++      'title' => t('Move item to delivery'),
++      'help' => t('Provide links to move each line items to a different delivery.'),
++      'handler' => 'commerce_delivery_handler_line_item_set_delivery',
++    ),
++  );
++
++  /* Relate a line item to the delivery */
++  //$data['field_data_delivery_ref']['table']['group'] = t('Commerce Line Item');
++  $data['commerce_line_item']['delivery_ref'] = array(
++    'title' => t('Delivery ID'),
++    'help' => t('The uniquement internal identifier of the associated delivery.'),
++    'field' => array(
++      'handler' => 'commerce_delivery_handler_field_line_item_delivery',
++      'click sortable' => TRUE,
++    ),
++    'filter' => array(
++      'handler' => 'views_handler_filter_numeric',
++    ),
++    'sort' => array(
++      'handler' => 'views_handler_sort',
++    ),
++    'argument' => array(
++      'handler' => 'views_handler_argument_numeric',
++      'numeric' => TRUE,
++    ),
++    'relationship' => array(
++      'handler' => 'views_handler_relationship',
++      'base' => 'commerce_delivery',
++      'field' => 'delivery_id',
++      'relationship table' => 'field_data_delivery_ref',
++      'relationship field' => 'delivery_ref_value',
++      'label' => t('Delivery', array(), array('context' => 'a drupal commerce delivery')),
++    )
++  );
++
++  return $data;
++
++}
++
+diff --git a/includes/views/commerce_delivery.views_default.inc b/includes/views/commerce_delivery.views_default.inc
+new file mode 100644
+index 0000000..54f7407
+--- /dev/null
++++ b/includes/views/commerce_delivery.views_default.inc
+@@ -0,0 +1,175 @@
++<?php
++
++/**
++ * @file
++ * Implements hook_views_default_views().
++ */
++function commerce_delivery_views_default_views() {
++  $views = array();
++
++  $view = new view();
++  $view->name = 'order_deliveries';
++  $view->description = '';
++  $view->tag = 'default';
++  $view->base_table = 'commerce_delivery';
++  $view->human_name = 'Order deliveries';
++  $view->core = 7;
++  $view->api_version = '3.0';
++  $view->disabled = FALSE; /* Edit this to true to make a default view disabled initially */
++
++  /* Display: Master */
++  $handler = $view->new_display('default', 'Master', 'default');
++  $handler->display->display_options['title'] = 'Order deliveries';
++  $handler->display->display_options['use_ajax'] = TRUE;
++  $handler->display->display_options['use_more_always'] = FALSE;
++  $handler->display->display_options['access']['type'] = 'none';
++  $handler->display->display_options['cache']['type'] = 'none';
++  $handler->display->display_options['query']['type'] = 'views_query';
++  $handler->display->display_options['exposed_form']['type'] = 'basic';
++  $handler->display->display_options['pager']['type'] = 'full';
++  $handler->display->display_options['pager']['options']['items_per_page'] = '10';
++  $handler->display->display_options['style_plugin'] = 'table';
++  /* No results behavior: Global: Text area */
++  $handler->display->display_options['empty']['area']['id'] = 'area';
++  $handler->display->display_options['empty']['area']['table'] = 'views';
++  $handler->display->display_options['empty']['area']['field'] = 'area';
++  $handler->display->display_options['empty']['area']['empty'] = TRUE;
++  $handler->display->display_options['empty']['area']['content'] = 'Nothing found';
++  $handler->display->display_options['empty']['area']['format'] = 'commerce_order_message';
++  /* Field: Bulk operations: Commerce Delivery */
++  $handler->display->display_options['fields']['views_bulk_operations']['id'] = 'views_bulk_operations';
++  $handler->display->display_options['fields']['views_bulk_operations']['table'] = 'commerce_delivery';
++  $handler->display->display_options['fields']['views_bulk_operations']['field'] = 'views_bulk_operations';
++  $handler->display->display_options['fields']['views_bulk_operations']['vbo_settings']['display_type'] = '0';
++  $handler->display->display_options['fields']['views_bulk_operations']['vbo_settings']['enable_select_all_pages'] = 1;
++  $handler->display->display_options['fields']['views_bulk_operations']['vbo_settings']['force_single'] = 0;
++  $handler->display->display_options['fields']['views_bulk_operations']['vbo_settings']['entity_load_capacity'] = '10';
++  $handler->display->display_options['fields']['views_bulk_operations']['vbo_operations'] = array(
++      'action::commerce_delivery_action_edit_status' => array(
++          'selected' => 1,
++          'postpone_processing' => 0,
++          'skip_confirmation' => 1,
++          'override_label' => 0,
++          'label' => '',
++      ),
++      'action::commerce_delivery_action_delete' => array(
++          'selected' => 1,
++          'postpone_processing' => 0,
++          'skip_confirmation' => 0,
++          'override_label' => 0,
++          'label' => '',
++      ),
++      'action::views_bulk_operations_delete_item' => array(
++          'selected' => 0,
++          'postpone_processing' => 0,
++          'skip_confirmation' => 0,
++          'override_label' => 0,
++          'label' => '',
++      ),
++      'action::views_bulk_operations_script_action' => array(
++          'selected' => 0,
++          'postpone_processing' => 0,
++          'skip_confirmation' => 0,
++          'override_label' => 0,
++          'label' => '',
++      ),
++      'action::views_bulk_operations_modify_action' => array(
++          'selected' => 0,
++          'postpone_processing' => 0,
++          'skip_confirmation' => 0,
++          'override_label' => 0,
++          'label' => '',
++          'settings' => array(
++              'show_all_tokens' => 1,
++              'display_values' => array(
++                  '_all_' => '_all_',
++              ),
++          ),
++      ),
++      'action::views_bulk_operations_argument_selector_action' => array(
++          'selected' => 0,
++          'skip_confirmation' => 0,
++          'override_label' => 0,
++          'label' => '',
++          'settings' => array(
++              'url' => '',
++          ),
++      ),
++      'action::system_send_email_action' => array(
++          'selected' => 0,
++          'postpone_processing' => 0,
++          'skip_confirmation' => 0,
++          'override_label' => 0,
++          'label' => '',
++      ),
++  );
++  /* Field: Commerce Delivery: Delivery id */
++  $handler->display->display_options['fields']['delivery_id']['id'] = 'delivery_id';
++  $handler->display->display_options['fields']['delivery_id']['table'] = 'commerce_delivery';
++  $handler->display->display_options['fields']['delivery_id']['field'] = 'delivery_id';
++  $handler->display->display_options['fields']['delivery_id']['element_label_colon'] = FALSE;
++  /* Field: Commerce Delivery: Delivery items */
++  $handler->display->display_options['fields']['items']['id'] = 'items';
++  $handler->display->display_options['fields']['items']['table'] = 'commerce_delivery';
++  $handler->display->display_options['fields']['items']['field'] = 'items';
++  $handler->display->display_options['fields']['items']['label'] = 'Items';
++  $handler->display->display_options['fields']['items']['element_label_colon'] = FALSE;
++  /* Field: Commerce Delivery: Delivery status */
++  $handler->display->display_options['fields']['status']['id'] = 'status';
++  $handler->display->display_options['fields']['status']['table'] = 'commerce_delivery';
++  $handler->display->display_options['fields']['status']['field'] = 'status';
++  $handler->display->display_options['fields']['status']['label'] = 'Status';
++  $handler->display->display_options['fields']['status']['element_label_colon'] = FALSE;
++  /* Field: Commerce Delivery: Created date */
++  $handler->display->display_options['fields']['created']['id'] = 'created';
++  $handler->display->display_options['fields']['created']['table'] = 'commerce_delivery';
++  $handler->display->display_options['fields']['created']['field'] = 'created';
++  $handler->display->display_options['fields']['created']['label'] = 'Created';
++  $handler->display->display_options['fields']['created']['element_label_colon'] = FALSE;
++  $handler->display->display_options['fields']['created']['date_format'] = 'short';
++  /* Field: Commerce Delivery: Updated date */
++  $handler->display->display_options['fields']['changed']['id'] = 'changed';
++  $handler->display->display_options['fields']['changed']['table'] = 'commerce_delivery';
++  $handler->display->display_options['fields']['changed']['field'] = 'changed';
++  $handler->display->display_options['fields']['changed']['label'] = 'Updated';
++  $handler->display->display_options['fields']['changed']['element_label_colon'] = FALSE;
++  $handler->display->display_options['fields']['changed']['date_format'] = 'short';
++  /* Field: Commerce Delivery: Operations links */
++  $handler->display->display_options['fields']['operations']['id'] = 'operations';
++  $handler->display->display_options['fields']['operations']['table'] = 'commerce_delivery';
++  $handler->display->display_options['fields']['operations']['field'] = 'operations';
++  $handler->display->display_options['fields']['operations']['label'] = '';
++  $handler->display->display_options['fields']['operations']['element_label_colon'] = FALSE;
++  /* Contextual filter: Commerce Delivery: Order ID */
++  $handler->display->display_options['arguments']['order_id']['id'] = 'order_id';
++  $handler->display->display_options['arguments']['order_id']['table'] = 'commerce_delivery';
++  $handler->display->display_options['arguments']['order_id']['field'] = 'order_id';
++  $handler->display->display_options['arguments']['order_id']['default_action'] = 'default';
++  $handler->display->display_options['arguments']['order_id']['default_argument_type'] = 'raw';
++  $handler->display->display_options['arguments']['order_id']['default_argument_options']['index'] = '3';
++  $handler->display->display_options['arguments']['order_id']['summary']['number_of_records'] = '0';
++  $handler->display->display_options['arguments']['order_id']['summary']['format'] = 'default_summary';
++  $handler->display->display_options['arguments']['order_id']['summary_options']['items_per_page'] = '25';
++  /* Filter criterion: Commerce Delivery: Delivery status */
++  $handler->display->display_options['filters']['status']['id'] = 'status';
++  $handler->display->display_options['filters']['status']['table'] = 'commerce_delivery';
++  $handler->display->display_options['filters']['status']['field'] = 'status';
++  $handler->display->display_options['filters']['status']['exposed'] = TRUE;
++  $handler->display->display_options['filters']['status']['expose']['operator_id'] = 'status_op';
++  $handler->display->display_options['filters']['status']['expose']['label'] = 'Filter by status';
++  $handler->display->display_options['filters']['status']['expose']['operator'] = 'status_op';
++  $handler->display->display_options['filters']['status']['expose']['identifier'] = 'status';
++  $handler->display->display_options['filters']['status']['expose']['remember_roles'] = array(
++      2 => '2',
++      1 => 0,
++      3 => 0,
++  );
++
++  /* Display: Block */
++  $handler = $view->new_display('block', 'Block', 'block');
++
++  $views[$view->name] = $view;
++
++  return $views;
++}
++
+diff --git a/includes/views/commerce_delivery_handler_field_delivery_items.inc b/includes/views/commerce_delivery_handler_field_delivery_items.inc
+new file mode 100644
+index 0000000..5d9dea1
+--- /dev/null
++++ b/includes/views/commerce_delivery_handler_field_delivery_items.inc
+@@ -0,0 +1,28 @@
++<?php
++
++/**
++ * @file
++ * Field handler to select items.
++ */
++class commerce_delivery_handler_field_delivery_items extends views_handler_field {
++  function query() {
++    $this->ensure_my_table();
++  }
++
++  function render($values) {
++    $items = array();
++
++    $items_data = commerce_delivery_get_items($values->delivery_id);
++
++    if ($items_data) {
++      foreach ($items_data as $delivery_item) {
++        if ($delivery_item->qty) {
++          $line_item = commerce_line_item_load($delivery_item->line_item_id);
++          $items[] = $delivery_item->qty . '/' . round($line_item->quantity) . ' x ' . $line_item->line_item_label;
++        }
++      }
++    }
++
++    return $items ? implode('<br/>', $items) : t('Empty');
++  }
++}
+diff --git a/includes/views/commerce_delivery_handler_field_delivery_operations.inc b/includes/views/commerce_delivery_handler_field_delivery_operations.inc
+new file mode 100644
+index 0000000..2df9b0e
+--- /dev/null
++++ b/includes/views/commerce_delivery_handler_field_delivery_operations.inc
+@@ -0,0 +1,25 @@
++<?php
++
++/**
++ * @file
++ * Field handler to display operatons.
++ */
++class commerce_delivery_handler_field_delivery_operations extends views_handler_field {
++  function query() {
++    $this->ensure_my_table();
++  }
++
++  function render($values) {
++    $links = array(
++      'edit' => array(
++        'title' => t('Edit'),
++        'href' => 'admin/commerce/deliveries/' . $values->delivery_id . '/edit',
++      ),
++      'delete' => array(
++        'title' => t('Delete'),
++        'href' => 'admin/commerce/deliveries/' . $values->delivery_id . '/delete',
++      ),
++    );
++    return theme('links', array('links' => $links, 'attributes' => array('class' => array('links', 'inline', 'operations'))));
++  }
++}
+diff --git a/includes/views/commerce_delivery_handler_field_delivery_status.inc b/includes/views/commerce_delivery_handler_field_delivery_status.inc
+new file mode 100644
+index 0000000..6eecfa6
+--- /dev/null
++++ b/includes/views/commerce_delivery_handler_field_delivery_status.inc
+@@ -0,0 +1,13 @@
++<?php
++
++/**
++ * @file
++ * Field handler to select a delivery status.
++ */
++class commerce_delivery_handler_field_delivery_status extends views_handler_field {
++  function render($values) {
++    $value = commerce_delivery_status_get_title($values->{$this->field_alias});
++    // Only attempt to render a valid order status.
++      return $value;
++  }
++}
+diff --git a/includes/views/commerce_delivery_handler_field_line_item_delivery.inc b/includes/views/commerce_delivery_handler_field_line_item_delivery.inc
+new file mode 100644
+index 0000000..20523c0
+--- /dev/null
++++ b/includes/views/commerce_delivery_handler_field_line_item_delivery.inc
+@@ -0,0 +1,18 @@
++<?php
++
++/**
++ * @file
++ * Contains the basic delivery field handler.
++ */
++
++/**
++ * Field handler to provide simple renderer that allows linking to an order.
++ */
++class commerce_delivery_handler_field_line_item_delivery extends views_handler_field {
++	function query() {
++		$result = db_query("SELECT li.delivery_ref_value FROM {field_data_delivery_ref} li WHERE li.line_item_id IN (:line_item_ids)", array(':line_item_ids' => $this->value));
++		foreach ($result as $line_item) {
++			$values[] = intval($line_item->delivery_ref_value);
++		}
++	}
++}
+diff --git a/includes/views/commerce_delivery_handler_filter_delivery_items.inc b/includes/views/commerce_delivery_handler_filter_delivery_items.inc
+new file mode 100644
+index 0000000..38806f0
+--- /dev/null
++++ b/includes/views/commerce_delivery_handler_filter_delivery_items.inc
+@@ -0,0 +1,11 @@
++<?php
++
++/**
++ * @file
++ * Field handler to select a delivery status.
++ */
++class commerce_delivery_handler_filter_delivery_items extends views_handler_filter_in_operator {
++  function get_value_options() {
++    $this->value_options = 'qwerty';
++  }
++}
+diff --git a/includes/views/commerce_delivery_handler_filter_delivery_status.inc b/includes/views/commerce_delivery_handler_filter_delivery_status.inc
+new file mode 100644
+index 0000000..e7cab0e
+--- /dev/null
++++ b/includes/views/commerce_delivery_handler_filter_delivery_status.inc
+@@ -0,0 +1,11 @@
++<?php
++
++/**
++ * @file
++ * Field handler to select a delivery status.
++ */
++class commerce_delivery_handler_filter_delivery_status extends views_handler_filter_in_operator {
++  function get_value_options() {
++    $this->value_options = commerce_delivery_get_status();
++  }
++}
+diff --git a/includes/views/commerce_delivery_handler_line_item_set_delivery.inc b/includes/views/commerce_delivery_handler_line_item_set_delivery.inc
+new file mode 100644
+index 0000000..f3bb5c8
+--- /dev/null
++++ b/includes/views/commerce_delivery_handler_line_item_set_delivery.inc
+@@ -0,0 +1,47 @@
++<?php
++
++/**
++ * @file
++ * Field handler to present an order's operations links.
++ */
++class commerce_delivery_handler_line_item_set_delivery extends views_handler_field {
++  function construct() {
++    parent::construct();
++
++    $this->additional_fields['order_id'] = 'order_id';
++    $this->additional_fields['line_item_id'] = 'line_item_id';
++  }
++
++  function query() {
++    $this->ensure_my_table();
++    $this->add_additional_fields();
++  }
++
++  function render($values) {
++    $destination = drupal_get_destination();
++    $order_id = $values->{$this->aliases['order_id']};
++    $line_item_id = $values->{$this->aliases['line_item_id']};
++    $line_item = current(entity_load('commerce_line_item', array($line_item_id)));
++    $wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
++    $current_delivery_id = $wrapper->delivery_ref->value();
++
++    $deliveries = commerce_delivery_get_deliveries($order_id, 'active');
++
++    foreach ($deliveries as $type) {
++      foreach ($type as $delivery) {
++        if ($current_delivery_id != $delivery->delivery_id) {
++          $query = $destination;
++          $query['token'] = commerce_delivery_get_token($order_id, $line_item_id, $delivery->delivery_id);
++          $links[$delivery->delivery_id] = array(
++            'title' => $delivery->delivery_id,
++            'href' => 'admin/commerce/orders/' . $order_id . '/deliveries/move/' . $line_item_id . '/' . $delivery->delivery_id,
++            'query' => $query,
++          );
++        }
++      }
++    }
++    if (!empty($links)) {
++      return theme('links', array('links' => $links, 'attributes' => array('arguments' => $destination, 'class' => array('links', 'inline', 'operations'))));
++    }
++  }
++}
