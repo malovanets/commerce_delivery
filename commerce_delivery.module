@@ -308,36 +308,9 @@ function commerce_delivery_by_order_view($order) {
   ->execute();
 
   if ($results) {
-    foreach ($results['commerce_delivery'] as $key => $result) {
-      $items = array();
-
-      $result = current(entity_load('commerce_delivery', array($key)));
-
-      $items_data = commerce_delivery_get_items($key);
-
-      if ($items_data) {
-        foreach ($items_data as $delivery_item) {
-          if ($delivery_item->qty) {
-            $line_item = commerce_line_item_load($delivery_item->line_item_id);
-            $items[] = $delivery_item->qty . '/' . round($line_item->quantity) . ' x ' . $line_item->line_item_label;
-          }
-        }
-      }
-
-      $rows[$key] = array(
-        'delivery_id' => $key,
-        'items' => empty($items) ? t('None') : implode('<br/>', $items),
-        'status' => $status[$result->status],
-        'created' => date('d.m.Y', $result->created),
-        'updated' => date('d.m.Y', $result->changed),
-        'actions' => l(t('Edit'), 'admin/commerce/deliveries/' . $key . '/edit') . '&nbsp;&nbsp;&nbsp;&nbsp;' . l(t('Delete'), 'admin/commerce/deliveries/' . $key . '/delete'),
-      );
-    }
-
     $output['table'] = array(
-        '#theme' => 'table',
-        '#header' => $header,
-        '#rows' => $rows,
+      '#type' => 'markup',
+      '#markup' => views_embed_view('order_deliveries', 'block', $order->order_id),
     );
   }
   else {
@@ -463,7 +436,7 @@ function commerce_delivery_add_form($form, &$form_state, $delivery) {
       $form['items']['qty_' . $line['line_item_id']] = array(
         '#type' => 'textfield',
         '#title' => $line_item->line_item_label,
-        '#default_value' => round($line_item->quantity),
+        '#default_value' => round($line_item->quantity - commerce_delivery_get_total_assigned($line['line_item_id'], $delivery->order_id, false)),
         '#size' => 5,
       );
     }
@@ -508,20 +481,11 @@ function commerce_delivery_validate_qty($data, $redirect, $errors = false) {
   foreach ($order->commerce_line_items[LANGUAGE_NONE] as $line) {
     $line_item = commerce_line_item_load($line['line_item_id']);
 
-    $query = db_select('commerce_delivery_items', 'cdi')
-      ->fields('cdi', array('qty'))
-      ->condition('order_id', $data['order_id'], '=')
-      ->condition('line_item_id', $line['line_item_id'], '=');
-
-    if (isset($data['delivery_id'])) {
-      $query->condition('delivery_id', $data['delivery_id'], '!=');
+    if (!isset($data['delivery_id'])) {
+      $data['delivery_id'] = false;
     }
 
-    $query->addExpression('SUM(qty)', 'total');
-
-    $result = $query->execute()->fetch();
-
-    $max = $line_item->quantity - $result->total;
+    $max = $line_item->quantity - commerce_delivery_get_total_assigned($line['line_item_id'], $data['order_id'], $data['delivery_id']);
 
     if ($data['qty_' . $line['line_item_id']] > $max) {
       $errors = (bool)drupal_set_message(t('The maximum quantity for %l is %q', array('%q' => $max, '%l' => $line_item->line_item_label)), 'error');
@@ -535,6 +499,28 @@ function commerce_delivery_validate_qty($data, $redirect, $errors = false) {
   if ($errors) {
     drupal_goto($redirect);
   }
+}
+
+/**
+ * Gets the number of items assigned to a delivery.
+ *
+ * @param int $line_item_id
+ * @param int $order_id
+ * @param mixed $delivery_id
+ */
+function commerce_delivery_get_total_assigned($line_item_id, $order_id, $delivery_id) {
+  $query = db_select('commerce_delivery_items', 'cdi')
+  ->fields('cdi', array('qty'))
+  ->condition('order_id', $order_id, '=')
+  ->condition('line_item_id', $line_item_id, '=');
+
+  if ($delivery_id) {
+    $query->condition('delivery_id', $delivery_id, '!=');
+  }
+
+  $query->addExpression('SUM(qty)', 'total');
+
+  return $query->execute()->fetch()->total;
 }
 
 /**
@@ -584,10 +570,6 @@ function commerce_delivery_edit_form($form, &$form_state, $delivery) {
     );
   }
 
-  $form['destination'] = array(
-    '#type' => 'value',
-    '#value' => drupal_get_destination(),
-  );
   $form['actions'] = array('#type' => 'actions');
   $form['actions']['submit'] = array(
     '#type' => 'submit',
@@ -667,6 +649,59 @@ function commerce_delivery_page_delete_confirm_form_submit($form, &$form_state) 
   commerce_delivery_delete($delivery);
   drupal_set_message(t('Deleted delivery %label.', array('%label' => $delivery->delivery_id)));
   $form_state['redirect'] = 'admin/commerce/orders/' . $delivery->order_id . '/deliveries';
+}
+
+/**
+ * Implements hook_action_info().
+ */
+function commerce_delivery_action_info() {
+  $actions['commerce_delivery_action_delete'] = array(
+    'label' => t('Delete deliveries'),
+    'type' => 'commerce_delivery',
+    'configurable' => FALSE,
+    'triggers' => array('any'),
+  );
+
+  $actions['commerce_delivery_action_edit_status'] = array(
+    'label' => t('Change status'),
+    'type' => 'commerce_delivery',
+    'configurable' => TRUE,
+    'triggers' => array('any'),
+  );
+
+  return $actions;
+}
+
+function commerce_delivery_action_delete($delivery, $context) {
+  commerce_delivery_delete($delivery);
+}
+
+function commerce_delivery_action_edit_status_form($delivery, $context) {
+  $options = array();
+
+  foreach (commerce_delivery_get_status() as $status_id => $status) {
+    $options[$status_id] = $status;
+  }
+
+  $form['status'] = array(
+    '#type' => 'select',
+    '#title' => t('Select the status'),
+    '#options' => $options,
+  );
+
+  return $form;
+}
+
+function commerce_delivery_action_edit_status_submit($form, $context) {
+  $controller = entity_get_controller('commerce_delivery');
+
+  foreach ($context['selection'] as $delivery_id) {
+    $delivery = commerce_delivery_load($delivery_id);
+    $delivery->status = $context['input']['status'];
+    $controller->save($delivery);
+  }
+
+  return (array)$delivery;
 }
 
 /**
@@ -760,7 +795,7 @@ function commerce_delivery_settings_form($form, &$form_state) {
 function commerce_delivery_views_api() {
   return array(
     'api' => 3,
-    'path' => drupal_get_path('module', 'commerce_delivery') . '/includes',
+    'path' => drupal_get_path('module', 'commerce_delivery') . '/includes/views',
   );
 }
 

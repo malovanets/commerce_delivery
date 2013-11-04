@@ -228,8 +228,28 @@ function commerce_delivery_rules_action_info() {
     ),
     'group' => t('Commerce Line Item'),
   );
+  /*$actions['commerce_delivery_action_delete'] = array(
+      'label' => t('Delete a delivery'),
+      'parameter' => array(
+        'delivery' => array(
+          'type' => 'commerce_delivery',
+          'label' => t('Commerce Delivery'),
+        ),
+      ),
+      'group' => t('Commerce Delivery'),
+  );*/
   return $actions;
 }
+
+/**
+ * Rules action callback:
+ * delete a delivery.
+ */
+/*
+function commerce_delivery_action_delete($delivery) {
+  commerce_delivery_delete($delivery);
+}
+*/
 
 /**
  * Rules action callback:
@@ -255,7 +275,7 @@ function commerce_delivery_assign_orphans($delivery) {
   // getting shippable items from this order
   $order = commerce_order_load($delivery->order_id);
   $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
-  $items = $order_wrapper->commerce_line_items->value(); 
+  $items = $order_wrapper->commerce_line_items->value();
   foreach ($items as $line_item) {
     $wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
     // checking if it's orphan

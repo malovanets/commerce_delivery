@@ -7,10 +7,14 @@ core = 7.x
 files[] = includes/commerce_delivery.controller.inc
 
 ; Views handlers
-files[] = includes/commerce_delivery_handler_field_delivery_status.inc
-files[] = includes/commerce_delivery_handler_filter_delivery_status.inc
-files[] = includes/commerce_delivery_handler_line_item_set_delivery.inc
-files[] = includes/commerce_delivery_handler_line_item_delivery.inc
+files[] = includes/views/commerce_delivery_handler_field_delivery_operations.inc
+files[] = includes/views/commerce_delivery_handler_field_delivery_items.inc
+files[] = includes/views/commerce_delivery_handler_field_delivery_status.inc
+files[] = includes/views/commerce_delivery_handler_filter_delivery_status.inc
+files[] = includes/views/commerce_delivery_handler_line_item_set_delivery.inc
+files[] = includes/views/commerce_delivery_handler_line_item_delivery.inc
+files[] = includes/views/commerce_delivery.views_default.inc
+files[] = includes/views/commerce_delivery.views.inc
 
 dependencies[] = commerce
 dependencies[] = commerce_line_item
@@ -22,4 +26,3 @@ dependencies[] = rules
 dependencies[] = number
 
 configure = admin/commerce/config/delivery
-
